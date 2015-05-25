@@ -1,0 +1,5 @@
+
+-0>
+game start(id=2015-5-21-12-1-21)
+-1>
+game over

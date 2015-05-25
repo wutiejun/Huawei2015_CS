@@ -1,0 +1,13 @@
+
+-0>
+game start(id=replay)
+-1>
+game over
+-0>
+game start(id=replay)
+-1>
+game over
+-0>
+game start(id=replay)
+-1>
+game over
