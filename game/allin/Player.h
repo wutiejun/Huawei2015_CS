@@ -89,17 +89,6 @@ typedef enum SER_MSG_TYPES_
     //
 } SER_MSG_TYPES;
 
-typedef enum CLIENT_MSG_TYPES_
-{
-    // player到服务器的消息
-    CLIENT_MSG_TYPES_Reg,
-    CLIENT_MSG_TYPES_ACT_check,
-    CLIENT_MSG_TYPES_ACT_call, 
-    CLIENT_MSG_TYPES_ACT_raise,
-    CLIENT_MSG_TYPES_ACT_all_in,
-    CLIENT_MSG_TYPES_ACT_fold,
-} CLIENT_MSG_TYPES;
-
 /* 抽象消息结构 */
 typedef struct GAME_MSG_
 {
@@ -131,7 +120,7 @@ typedef enum CARD_POINT_
     CARD_POINT_Unknow,      /* 用于标识对手的未知卡片 */
     CARD_POINT_2 = 2,
     CARD_POINT_3,
-    CARD_POINT_4, 
+    CARD_POINT_4,
     CARD_POINT_5,
     CARD_POINT_6,
     CARD_POINT_7,
@@ -151,22 +140,44 @@ typedef struct CARD_
     CARD_COLOR Color;
 } CARD;
 
+typedef enum CLIENT_MSG_TYPES_
+{
+    // player到服务器的消息
+    CLIENT_MSG_TYPES_Reg,
+    CLIENT_MSG_TYPES_ACT_check,
+    CLIENT_MSG_TYPES_ACT_call,
+    CLIENT_MSG_TYPES_ACT_raise,
+    CLIENT_MSG_TYPES_ACT_all_in,
+    CLIENT_MSG_TYPES_ACT_fold,
+} CLIENT_MSG_TYPES;
+
 /* 玩家的处理策略 */
 typedef enum PLAYER_Action_
 {
     ACTION_check,       /* 让牌，即在前面的玩家，什么也不做，把机会给后面的玩家 */
     ACTION_call,        /* 跟进，即前面有人raise，即不re-raise，也不弃牌，则call， */
-    
+    ACTION_allin,
+    ACTION_raise,
+    ACTION_fold,
 } PLAYER_Action;
+
+typedef enum PLAYER_SEAT_TYPES_
+{
+    // 一局中player类型
+    PLAYER_SEAT_TYPES_none,
+    PLAYER_SEAT_TYPES_button,
+    PLAYER_SEAT_TYPES_small_blind,
+    PLAYER_SEAT_TYPES_big_blind,
+} PLAYER_SEAT_TYPES;
 
 /* 玩家信息 */
 typedef struct PLAYER_
 {
-    /* 静态属性 */    
+    /* 静态属性 */
     char PlayerID[32];
     char PlayerName[32];    /* player name, length of not more than 20 bytes */
 
-    /* 动态player 信息 */    
+    /* 动态player 信息 */
     int Status;             /* 当前局的当前状态 */
     int SeatIndex;          /* 当前局的位置 */
     CARD HoldCards[2];      /* 选手的两张底牌，不确定的 */

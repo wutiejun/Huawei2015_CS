@@ -2,7 +2,7 @@
 #include <stdlib.h>  //
 #include <string.h>  //strlen
 #include <unistd.h>  //usleep/close
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -17,17 +17,17 @@ bool server_msg_process(int size, const char* msg)
         return false;
     }
 
-    printf("get msg:\r\n");
-    
+    //printf("get msg:\r\n");
+
     if (NULL != strstr(msg, "inquire/"))
     {
-        //const char* response = "all_in";        
-        SER_MSG_TYPES type = Msg_GetMsgType(msg, size);
+        //const char* response = "all_in";
+        //SER_MSG_TYPES type = Msg_GetMsgType(msg, size);
         const char* response = "check";
-        printf("get msg %d: %s", (int)type, Msg_GetMsgNameByType(type));
+        //printf("get msg %d: %s", (int)type, Msg_GetMsgNameByType(type));
         send(m_socket_id, response, (int)strlen(response)+1, 0);
     }
-    
+
     return true;
 }
 
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
     {
         return -1;
     }
-    
+
     /* 提取命令行参数 */
     in_addr_t server_ip = inet_addr(argv[1]);
     in_port_t server_port = atoi(argv[2]);
@@ -53,25 +53,25 @@ int main(int argc, char* argv[])
     {
         my_name++;
     }
-    
+
     /* 创建socket */
     m_socket_id = socket(AF_INET, SOCK_STREAM, 0);
-    
+
     /* 绑定自己的IP */
     sockaddr_in my_addr;
     my_addr.sin_addr.s_addr = my_ip;
     my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(my_port);   
-    
+    my_addr.sin_port = htons(my_port);
+
     long flag = 1;
-    setsockopt(m_socket_id, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag));  
-    
+    setsockopt(m_socket_id, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag));
+
     if (bind(m_socket_id, (sockaddr*)&my_addr, sizeof(sockaddr)) < 0)
     {
         printf("bind failed: %m\n");
         return -1;
     }
-    
+
     /* 连接服务器 */
     sockaddr_in server_addr;
     server_addr.sin_addr.s_addr = server_ip;
@@ -82,8 +82,8 @@ int main(int argc, char* argv[])
     {
         usleep(100*1000);
     };
-    printf("connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));    
-    
+    printf("connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+
     /* 向server注册 */
     char reg_msg[50]="";
     snprintf(reg_msg, sizeof(reg_msg) - 1, "reg: %d %s \n", my_id, my_name);
@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     }
 
 	close(m_socket_id);
-    
+
     return 0;
 }
 
