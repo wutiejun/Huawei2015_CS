@@ -115,28 +115,28 @@ typedef enum CARD_COLOR_
 } CARD_COLOR;
 
 /* 卡片大小 */
-typedef enum CARD_POINT_
+typedef enum CARD_POINTT_
 {
-    CARD_POINT_Unknow,      /* 用于标识对手的未知卡片 */
-    CARD_POINT_2 = 2,
-    CARD_POINT_3,
-    CARD_POINT_4,
-    CARD_POINT_5,
-    CARD_POINT_6,
-    CARD_POINT_7,
-    CARD_POINT_8,
-    CARD_POINT_9,
-    CARD_POINT_10,
-    CARD_POINT_J,
-    CARD_POINT_Q,
-    CARD_POINT_K,
-    CARD_POINT_A,
-} CARD_POIN;
+    CARD_POINTT_Unknow,      /* 用于标识对手的未知卡片 */
+    CARD_POINTT_2 = 2,
+    CARD_POINTT_3,
+    CARD_POINTT_4,
+    CARD_POINTT_5,
+    CARD_POINTT_6,
+    CARD_POINTT_7,
+    CARD_POINTT_8,
+    CARD_POINTT_9,
+    CARD_POINTT_10,
+    CARD_POINTT_J,
+    CARD_POINTT_Q,
+    CARD_POINTT_K,
+    CARD_POINTT_A,
+} CARD_POINT;
 
 /* play card */
 typedef struct CARD_
 {
-    CARD_POIN Point;
+    CARD_POINT Point;
     CARD_COLOR Color;
 } CARD;
 
@@ -183,17 +183,6 @@ typedef struct PLAYER_
     CARD HoldCards[2];      /* 选手的两张底牌，不确定的 */
 
 } PLAYER;
-
-/* 每一局信息 */
-typedef struct RoundInfo_
-{
-    int PlayerCount;        /* 玩家个数 */
-    PLAYER * Players[8];    /* 8个玩家，暂时用指针 */
-    CARD FlopCards[3];      /* 3张公牌 */
-    CARD TurnCards[1];      /* 1张转牌 */
-    CARD RiverCards[1];     /* 1张河牌 */
-} RoundInfo;
-
 
 /****************************************************************************************/
 SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);

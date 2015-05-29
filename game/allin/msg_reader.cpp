@@ -47,6 +47,35 @@ typedef struct MSG_CARD_INFO_
     CARD Cards[5];    /* 前3张公牌，第4张转牌，第5张河牌，如果是手牌，就只有两张 */
 } MSG_CARD_INFO;
 
+typedef struct MSG_POT_WIN_INFO_
+{
+    char PlayerID[32];
+    unsigned int Jetton;
+} MSG_POT_WIN_INFO;
+
+typedef struct MSG_POT_WIN_INFO_ MSG_PLAYER_BLIND_INFO;
+
+typedef struct MSG_BLIND_INFO_
+{
+    int BlindNum;
+    MSG_PLAYER_BLIND_INFO BlindPlayers[2];    /* 只有大小盲注 */
+} MSG_BLIND_INFO;
+
+typedef struct MSG_SHOWDWON_PLAYER_CARD_
+{
+    int Index;  /* 选手名次 */
+    char PlayerID[32];
+    CARD HoldCards[2];
+    char CardType[32];
+} MSG_SHOWDWON_PLAYER_CARD;
+
+typedef struct MSG_SHOWDWON_INFO_
+{
+    int PlayerNum;
+    CARD PublicCards[5];    /* 5张公牌 */
+    MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
+} MSG_SHOWDWON_INFO;
+
 MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
 {
     /***************************************************************************
@@ -297,6 +326,46 @@ int Msg_ReadSeatInfo(MSG_READ_INFO *pMsgInfo, MSG_SEAT_INFO * pSetInfo)
     return 0;
 }
 
+ CARD_POINT GetCardPoint(char CardPoint[4])
+ {
+     switch (CardPoint[0])
+     {
+         case '2' : return CARD_POINTT_2;
+         case '3' : return CARD_POINTT_3;
+         case '4' : return CARD_POINTT_4;
+         case '5' : return CARD_POINTT_5;
+         case '6' : return CARD_POINTT_6;
+         case '7' : return CARD_POINTT_7;
+         case '8' : return CARD_POINTT_8;
+         case '9' : return CARD_POINTT_9;
+         case '1' : return CARD_POINTT_10;  /* 如果是1的话，必然是10 */
+         case 'J' : return CARD_POINTT_J;
+         case 'Q' : return CARD_POINTT_Q;
+         case 'K' : return CARD_POINTT_K;
+         case 'A' : return CARD_POINTT_A;
+     }
+ }
+
+const char * GetCardPointName(CARD_POINT point)
+{
+    switch (point)
+    {
+         case CARD_POINTT_2: return "2" ;
+         case CARD_POINTT_3: return "3" ;
+         case CARD_POINTT_4: return "4" ;
+         case CARD_POINTT_5: return "5" ;
+         case CARD_POINTT_6: return "6" ;
+         case CARD_POINTT_7: return "7" ;
+         case CARD_POINTT_8: return "8" ;
+         case CARD_POINTT_9: return "9" ;
+         case CARD_POINTT_10:return "10";
+         case CARD_POINTT_J: return "J" ;
+         case CARD_POINTT_Q: return "Q" ;
+         case CARD_POINTT_K: return "K" ;
+         case CARD_POINTT_A: return "A" ;
+    }
+ }
+
 void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
 {
     #define SPADES      "SPADES "
@@ -304,12 +373,14 @@ void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
     #define CLUBS       "CLUBS "
     #define DIAMONDS    "DIAMONDS "
     CARD * pCard = NULL;
+    char Point[4] = {0};
 
     if (memcmp((void *)LineBuffer, (void *)SPADES, sizeof(SPADES) - 1) == 0)
     {
         pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_SPADES;
-        sscanf(LineBuffer + sizeof(SPADES) - 1, "%d", (int *)&pCard->Point);
+        sscanf(LineBuffer + sizeof(SPADES) - 1, "%s", Point);
+        pCard->Point = GetCardPoint(Point);
         pCards->CardNum ++;
         return;
     }
@@ -317,7 +388,8 @@ void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
     {
         pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_HEARTS;
-        sscanf(LineBuffer + sizeof(HEARTS) - 1, "%d", (int *)&pCard->Point);
+        sscanf(LineBuffer + sizeof(HEARTS) - 1, "%s", Point);
+        pCard->Point = GetCardPoint(Point);
         pCards->CardNum ++;
         return;
     }
@@ -325,7 +397,8 @@ void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
     {
         pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_CLUBS;
-        sscanf(LineBuffer + sizeof(CLUBS) - 1, "%d", (int *)&pCard->Point);
+        sscanf(LineBuffer + sizeof(CLUBS) - 1, "%s", Point);
+        pCard->Point = GetCardPoint(Point);
         pCards->CardNum ++;
         return;
     }
@@ -333,14 +406,15 @@ void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
     {
         pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_DIAMONDS;
-        sscanf(LineBuffer + sizeof(DIAMONDS) - 1, "%d", (int *)&pCard->Point);
+        sscanf(LineBuffer + sizeof(DIAMONDS) - 1, "%s", Point);
+        pCard->Point = GetCardPoint(Point);
         pCards->CardNum ++;
         return;
     }
     return;
 }
 
-/* 读取公共牌的消息 */
+/* 读取牌消息，包括公牌，转牌，河牌才手牌 */
 int Msg_ReadCardsInfo(MSG_READ_INFO *pMsgInfo, MSG_CARD_INFO * pCards)
 {
     char LineBuffer[256] = {0};
@@ -364,11 +438,143 @@ int Msg_ReadCardsInfo(MSG_READ_INFO *pMsgInfo, MSG_CARD_INFO * pCards)
     return 0;
 }
 
-SER_MSG_TYPES Msg_Read(char * pMsg, int MaxLen, void * pData, Msg_LineReader LineReader)
+void Msg_ReadPlayJettonInfo(MSG_POT_WIN_INFO * pPotWinInfo, char LineBuffer[256])
 {
-    return SER_MSG_TYPE_none;
+    int ReadNum = 0;
+
+    /* "pot-win/ \n1001: 250 \n/pot-win \n", */
+    sscanf(LineBuffer, "%s %d", pPotWinInfo->PlayerID, &pPotWinInfo->Jetton);
+
+    ReadNum = strlen(pPotWinInfo->PlayerID);
+    while (ReadNum >= 0)
+    {
+        if (pPotWinInfo->PlayerID[ReadNum] == ':')
+        {
+            pPotWinInfo->PlayerID[ReadNum] = '\0';
+            break;
+        }
+        ReadNum --;
+    }
+    //printf("%s[%d]\r\n", pPotWinInfo->PlayerID, pPotWinInfo->Jetton);
+    return;
 }
 
+int Msg_ReadPotWinInfo(MSG_READ_INFO *pMsgInfo, MSG_POT_WIN_INFO * pPotWinInfo)
+{
+    char LineBuffer[256] = {0};
+    int ReadNum = 0;
+
+    /* 先读取消息类型，第一行 */
+    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+    Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+    memset(LineBuffer, 0, sizeof(LineBuffer));
+    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+
+    Msg_ReadPlayJettonInfo(pPotWinInfo, LineBuffer);
+
+    //printf("%s[%d]\r\n", LineBuffer, pPotWinInfo->Jetton);
+    return 0;
+}
+
+int Msg_ReadBlindInfo(MSG_READ_INFO *pMsgInfo, MSG_BLIND_INFO * pBlindInfo)
+{
+    char LineBuffer[256] = {0};
+    int ReadNum = 0;
+
+    /* 先读取消息类型，第一行 */
+    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+    Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+
+    while (memcmp(LineBuffer, "/blind", sizeof("/blind") - 1) != 0)
+    {
+        //printf("Msg_ReadBlindInfo:%s", LineBuffer);
+        memset(LineBuffer, 0, sizeof(LineBuffer));
+        ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+        Msg_ReadPlayJettonInfo(&pBlindInfo->BlindPlayers[pBlindInfo->BlindNum], LineBuffer);
+        pBlindInfo->BlindNum ++;
+    }
+    /* 第一行是blind/，多加了一次，这里减掉 */
+    pBlindInfo->BlindNum --;
+
+    //printf("%s[%d]\r\n", LineBuffer, pPotWinInfo->Jetton);
+    return 0;
+}
+
+
+
+const char * GetCardColorName(CARD * pCard)
+{
+    switch (pCard->Color)
+    {
+        default:
+        case CARD_COLOR_CLUBS:      return "CLUBS";
+        case CARD_COLOR_DIAMONDS:   return "DIAMONDS";
+        case CARD_COLOR_HEARTS:     return "HEARTS";
+        case CARD_COLOR_SPADES:     return "SPADES";
+    }
+}
+
+
+CARD_COLOR GetCardColor(const char *pColor)
+{
+    if (strcmp("CLUBS", pColor) == 0) return CARD_COLOR_CLUBS;
+    if (strcmp("DIAMONDS", pColor) == 0) return CARD_COLOR_DIAMONDS;
+    if (strcmp("HEARTS", pColor) == 0) return CARD_COLOR_HEARTS;
+    if (strcmp("SPADES", pColor) == 0) return CARD_COLOR_SPADES;
+    return CARD_COLOR_Unknow;
+}
+
+void Msg_ReadPlayerCardInfo(MSG_SHOWDWON_PLAYER_CARD * pPlayerCard, char LineBuffer[256])
+{
+    char CardPoint1[4] = {0};
+    char CardColor1[32] = {0};
+    char CardPoint2[4] = {0};
+    char CardColor2[32] = {0};
+
+    //printf("%s", LineBuffer);
+    /* "1: 1001 SPADES 10 DIAMONDS 10 FULL_HOUSE", */
+    sscanf(LineBuffer, "%d: %s %s %s %s %s %s",
+           &pPlayerCard->Index,
+           pPlayerCard->PlayerID,
+           CardColor1,CardPoint1,
+           CardColor2,CardPoint2,
+           pPlayerCard->CardType);
+    pPlayerCard->HoldCards[0].Color = GetCardColor(CardColor1);
+    pPlayerCard->HoldCards[0].Point = GetCardPoint(CardPoint1);
+    pPlayerCard->HoldCards[1].Color = GetCardColor(CardColor2);
+    pPlayerCard->HoldCards[1].Point = GetCardPoint(CardPoint2);
+    return;
+}
+
+int Msg_ReadShowDownInfo(MSG_READ_INFO *pMsgInfo, MSG_SHOWDWON_INFO * pShowDown)
+{
+    char LineBuffer[256] = {0};
+    int ReadNum = 0;
+    const char * pStart = NULL;
+
+    pStart = strstr(pMsgInfo->pMsg, "/common \n");
+    if (pStart == NULL)
+    {
+        return 0;
+    }
+
+    pStart += sizeof("/common \n") - 1;
+    ReadNum = pStart - pMsgInfo->pMsg;
+    Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+
+    while (memcmp(LineBuffer, "/showdown", sizeof("/showdown") - 1) != 0)
+    {
+        memset(LineBuffer, 0, sizeof(LineBuffer));
+        ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        //printf("%s", LineBuffer);
+        Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+        Msg_ReadPlayerCardInfo(&pShowDown->Players[pShowDown->PlayerNum], LineBuffer);
+        pShowDown->PlayerNum ++;
+    }
+    pShowDown->PlayerNum --;
+    return 0;
+}
 
 /* 根据坐位类型返回坐位信息 */
 const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
@@ -376,37 +582,56 @@ const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
     switch (pPlayerInfo->Type)
     {
         default:
-        case PLAYER_SEAT_TYPES_none: return "common";
+        case PLAYER_SEAT_TYPES_none:        return "common";
         case PLAYER_SEAT_TYPES_small_blind: return "small blind";
-        case PLAYER_SEAT_TYPES_big_blind: return "big blind";
-        case PLAYER_SEAT_TYPES_button: return "Button";
+        case PLAYER_SEAT_TYPES_big_blind:   return "big blind";
+        case PLAYER_SEAT_TYPES_button:      return "Button";
     }
 }
 
-const char * Msg_GetCardColor(CARD * pCard)
+/* 每一局信息 */
+typedef struct RoundInfo_
 {
-    switch (pCard->Color)
+    int RoundStatus;    /* 当前局状态 */
+    MSG_SEAT_INFO SeatInfo;
+    MSG_CARD_INFO PublicCards;
+    MSG_BLIND_INFO Blind;
+    MSG_SHOWDWON_INFO ShowDown;
+    MSG_POT_WIN_INFO PotWin;
+} RoundInfo;
+
+int Msg_Read(char * pMsg, int MaxLen, void * pData, RoundInfo * pRound)
+{
+    SER_MSG_TYPES Type = Msg_GetMsgType(pMsg, MaxLen);
+    MSG_READ_INFO MsgInfo = {0};
+
+    MsgInfo.pMsg = pMsg;
+    MsgInfo.MaxLen = MaxLen;
+
+    switch (Type)
     {
-        default:
-        case CARD_COLOR_CLUBS: return "CLUBS";
-        case CARD_COLOR_DIAMONDS: return "DIAMONDS";
-        case CARD_COLOR_HEARTS: return "HEARTS";
-        case CARD_COLOR_SPADES: return "SPADES";
+        default: return 0;
+        case SER_MSG_TYPE_seat_info:
+            return Msg_ReadSeatInfo(&MsgInfo, &pRound->SeatInfo);
+        case SER_MSG_TYPE_blind:
+            return Msg_ReadBlindInfo(&MsgInfo, &pRound->Blind);
     }
+
+    return 0;
 }
 
 const char  * TestMessages[] =
 {
-    "seat/ \nbutton: 1002 2000 8000 \nsmall blind: 1003 2000 8000 \nbig blind: 1001 2000 8000\n1004 2000 8000 /seat \n",
-    "blind/ \n1003: 50 \n1001: 100 \n/blind \n",
-    "hold/ \nCLUBS 10 \nDIAMONDS 8 \n/hold \n",
-    "inquire/ \n1001 1900 8000 100 blind \n1003 1950 8000 50 blind \ntotal pot: 150 \n/inquire \n",
-    "flop/ \nSPADES 2 \nSPADES 3 \nDIAMONDS 4 \n/flop \n",
-    "turn/ \nHEARTS 10 \n/turn \n",
-    "river/ \nSPADES 4 \n/river \n",
-    "showdown/ \ncommon/ SPADES 2 \nSPADES 3 \nDIAMONDS 4 \nHEARTS 10 \nSPADES 4 \n/common \n1: 1001 SPADES 10 DIAMONDS 10 FULL_HOUSE \n2: 1002 SPADES 7 DIAMONDS Q ONE_PAIR \n/showdown \n",
-    "pot-win/ \n1001: 250 \n/pot-win \n",
-    "game-over \n"
+    /* 0 */ "seat/ \nbutton: 1002 2000 8000 \nsmall blind: 1003 2000 8000 \nbig blind: 1001 2000 8000\n1004 2000 8000 /seat \n",
+    /* 1 */ "blind/ \n1003: 50 \n1001: 100 \n/blind \n",
+    /* 2 */ "hold/ \nCLUBS J \nDIAMONDS 8 \n/hold \n",
+    /* 3 */ "inquire/ \n1001 1900 8000 100 blind \n1003 1950 8000 50 blind \ntotal pot: 150 \n/inquire \n",
+    /* 4 */ "flop/ \nSPADES A \nSPADES 3 \nDIAMONDS 4 \n/flop \n",
+    /* 5 */ "turn/ \nHEARTS Q \n/turn \n",
+    /* 6 */ "river/ \nSPADES K \n/river \n",
+    /* 7 */ "showdown/ \ncommon/ SPADES 2 \nSPADES 3 \nDIAMONDS 4 \nHEARTS 10 \nSPADES 4 \n/common \n1: 1001 SPADES 10 DIAMONDS 10 FULL_HOUSE \n2: 1002 SPADES 7 DIAMONDS Q ONE_PAIR \n/showdown \n",
+    /* 8 */ "pot-win/ \n1001: 250 \n/pot-win \n",
+    /* 9 */ "game-over \n"
 };
 
 void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
@@ -428,7 +653,8 @@ void Debug_PrintPublicChardInfo(MSG_CARD_INFO * pPublicCard)
     for (index = 0; index < pPublicCard->CardNum; index ++)
     {
         pCard = &pPublicCard->Cards[index];
-        printf("card_%d %s %d\n", index, Msg_GetCardColor(pCard), pCard->Point);
+        printf("card_%d %s %s\n", index, GetCardColorName(pCard),
+               GetCardPointName(pCard->Point));
     }
     return;
 }
@@ -441,7 +667,7 @@ int main(int argc, char * argv[])
     MSG_READ_INFO MsgInfo = {0};
     MSG_SEAT_INFO SeatInfo = {0};
     MSG_CARD_INFO PublicCards = {0};
-    MSG_CARD_INFO HoldCards = {0};
+
 
     for (index = 0; index < count; index++)
     {
@@ -478,13 +704,62 @@ int main(int argc, char * argv[])
     Debug_PrintPublicChardInfo(&PublicCards);
 
     /* 手牌解析 */
-    printf("test hold card info:\r\n");
-    memset(&MsgInfo, 0, sizeof(MsgInfo));
-    MsgInfo.pMsg = TestMessages[2];
-    MsgInfo.MaxLen = strlen(TestMessages[2]);
-    Msg_ReadCardsInfo(&MsgInfo, &HoldCards);
+    {
+        MSG_CARD_INFO HoldCards = {0};
+        printf("test hold card info:\r\n");
+        memset(&MsgInfo, 0, sizeof(MsgInfo));
+        MsgInfo.pMsg = TestMessages[2];
+        MsgInfo.MaxLen = strlen(TestMessages[2]);
+        Msg_ReadCardsInfo(&MsgInfo, &HoldCards);
+        Debug_PrintPublicChardInfo(&HoldCards);
+    }
 
-    Debug_PrintPublicChardInfo(&HoldCards);
+    {
+        MSG_POT_WIN_INFO PotWin = {0};
+        printf("test pot win info:\r\n");
+        memset(&MsgInfo, 0, sizeof(MsgInfo));
+        MsgInfo.pMsg = TestMessages[8];
+        MsgInfo.MaxLen = strlen(TestMessages[8]);
+        Msg_ReadPotWinInfo(&MsgInfo, &PotWin);
+        printf("%s %d\r\n", PotWin.PlayerID, PotWin.Jetton);
+    }
+
+    {
+        MSG_BLIND_INFO BlindInfo = {0};
+        printf("test blind info:\r\n");
+        memset(&MsgInfo, 0, sizeof(MsgInfo));
+        MsgInfo.pMsg = TestMessages[1];
+        MsgInfo.MaxLen = strlen(TestMessages[1]);
+        Msg_ReadBlindInfo(&MsgInfo, &BlindInfo);
+        printf("blind num %d\r\n", BlindInfo.BlindNum);
+        for (index = 0; index < BlindInfo.BlindNum; index ++)
+        {
+            printf("%s %d\r\n", BlindInfo.BlindPlayers[index].PlayerID,
+                   BlindInfo.BlindPlayers[index].Jetton);
+        }
+    }
+
+    {
+        /* show down msg */
+        MSG_SHOWDWON_INFO showDown = {0};
+        MSG_SHOWDWON_PLAYER_CARD * pPlayerCard = NULL;
+        printf("test show down info:\r\n");
+        memset(&MsgInfo, 0, sizeof(MsgInfo));
+        MsgInfo.pMsg = TestMessages[7];
+        MsgInfo.MaxLen = strlen(TestMessages[7]);
+        Msg_ReadShowDownInfo(&MsgInfo, &showDown);
+        for (index = 0; index < showDown.PlayerNum; index ++)
+        {
+            pPlayerCard = &showDown.Players[index];
+            printf("%d %s %s %s %s %s\r\n",
+                   pPlayerCard->Index,
+                   GetCardColorName(&pPlayerCard->HoldCards[0]),
+                   GetCardPointName(pPlayerCard->HoldCards[0].Point),
+                   GetCardColorName(&pPlayerCard->HoldCards[1]),
+                   GetCardPointName(pPlayerCard->HoldCards[1].Point),
+                   pPlayerCard->CardType);
+        }
+    }
 
     return 0;
 }
