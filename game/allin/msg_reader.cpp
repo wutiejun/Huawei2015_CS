@@ -41,11 +41,11 @@ typedef struct MSG_SEAT_INFO_
     PLAYER_SEAT_INFO Players[8];
 } MSG_SEAT_INFO;
 
-typedef struct MSG_PUBLIC_CARD_INFO_
+typedef struct MSG_CARD_INFO_
 {
     int CardNum;
-    CARD PublicCards[5];    /* 前3张公牌，第4张转牌，第5张河牌 */
-} MSG_PUBLIC_CARD_INFO;
+    CARD Cards[5];    /* 前3张公牌，第4张转牌，第5张河牌，如果是手牌，就只有两张 */
+} MSG_CARD_INFO;
 
 MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
 {
@@ -297,7 +297,7 @@ int Msg_ReadSeatInfo(MSG_READ_INFO *pMsgInfo, MSG_SEAT_INFO * pSetInfo)
     return 0;
 }
 
-void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer[256])
+void Msg_ReadCardsInfo_Card(MSG_CARD_INFO * pCards, char LineBuffer[256])
 {
     #define SPADES      "SPADES "
     #define HEARTS      "HEARTS "
@@ -307,7 +307,7 @@ void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer
 
     if (memcmp((void *)LineBuffer, (void *)SPADES, sizeof(SPADES) - 1) == 0)
     {
-        pCard = &pCards->PublicCards[pCards->CardNum];
+        pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_SPADES;
         sscanf(LineBuffer + sizeof(SPADES) - 1, "%d", (int *)&pCard->Point);
         pCards->CardNum ++;
@@ -315,7 +315,7 @@ void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer
     }
     if (memcmp((void *)LineBuffer, (void *)HEARTS, sizeof(HEARTS) - 1) == 0)
     {
-        pCard = &pCards->PublicCards[pCards->CardNum];
+        pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_HEARTS;
         sscanf(LineBuffer + sizeof(HEARTS) - 1, "%d", (int *)&pCard->Point);
         pCards->CardNum ++;
@@ -323,7 +323,7 @@ void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer
     }
     if (memcmp((void *)LineBuffer, (void *)CLUBS, sizeof(CLUBS) - 1) == 0)
     {
-        pCard = &pCards->PublicCards[pCards->CardNum];
+        pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_CLUBS;
         sscanf(LineBuffer + sizeof(CLUBS) - 1, "%d", (int *)&pCard->Point);
         pCards->CardNum ++;
@@ -331,7 +331,7 @@ void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer
     }
     if (memcmp((void *)LineBuffer, (void *)DIAMONDS, sizeof(DIAMONDS) - 1) == 0)
     {
-        pCard = &pCards->PublicCards[pCards->CardNum];
+        pCard = &pCards->Cards[pCards->CardNum];
         pCard->Color = CARD_COLOR_DIAMONDS;
         sscanf(LineBuffer + sizeof(DIAMONDS) - 1, "%d", (int *)&pCard->Point);
         pCards->CardNum ++;
@@ -341,7 +341,7 @@ void Msg_ReadPublicCardsInfo_Card(MSG_PUBLIC_CARD_INFO * pCards, char LineBuffer
 }
 
 /* 读取公共牌的消息 */
-int Msg_ReadPublicCardsInfo(MSG_READ_INFO *pMsgInfo, MSG_PUBLIC_CARD_INFO * pCards)
+int Msg_ReadCardsInfo(MSG_READ_INFO *pMsgInfo, MSG_CARD_INFO * pCards)
 {
     char LineBuffer[256] = {0};
     int ReadNum = 0;
@@ -350,16 +350,16 @@ int Msg_ReadPublicCardsInfo(MSG_READ_INFO *pMsgInfo, MSG_PUBLIC_CARD_INFO * pCar
     /* 先读取消息类型，第一行 */
     ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
     Line ++;
-    printf("%s\r\n", LineBuffer);
+    //printf("%s\r\n", LineBuffer);
     while (ReadNum > 0)
     {
         memset(LineBuffer, 0, sizeof(LineBuffer));
         Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
         ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
-        printf("%s\r\n", LineBuffer);
+        //printf("%s\r\n", LineBuffer);
         Line ++;
         //
-        Msg_ReadPublicCardsInfo_Card(pCards, LineBuffer);
+        Msg_ReadCardsInfo_Card(pCards, LineBuffer);
     }
     return 0;
 }
@@ -368,6 +368,8 @@ SER_MSG_TYPES Msg_Read(char * pMsg, int MaxLen, void * pData, Msg_LineReader Lin
 {
     return SER_MSG_TYPE_none;
 }
+
+
 /* 根据坐位类型返回坐位信息 */
 const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
 {
@@ -419,13 +421,13 @@ void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
     return;
 }
 
-void Debug_PrintPublicChardInfo(MSG_PUBLIC_CARD_INFO * pPublicCard)
+void Debug_PrintPublicChardInfo(MSG_CARD_INFO * pPublicCard)
 {
     int index = 0;
     CARD * pCard = NULL;
     for (index = 0; index < pPublicCard->CardNum; index ++)
     {
-        pCard = &pPublicCard->PublicCards[index];
+        pCard = &pPublicCard->Cards[index];
         printf("card_%d %s %d\n", index, Msg_GetCardColor(pCard), pCard->Point);
     }
     return;
@@ -438,7 +440,8 @@ int main(int argc, char * argv[])
     int index = 0;
     MSG_READ_INFO MsgInfo = {0};
     MSG_SEAT_INFO SeatInfo = {0};
-    MSG_PUBLIC_CARD_INFO PublicCards = {0};
+    MSG_CARD_INFO PublicCards = {0};
+    MSG_CARD_INFO HoldCards = {0};
 
     for (index = 0; index < count; index++)
     {
@@ -456,23 +459,32 @@ int main(int argc, char * argv[])
     }
 
     /* 测试flop，turn，以及rirver牌的消息 */
-    printf("test card info:\r\n");
+    printf("test public card info:\r\n");
     memset(&MsgInfo, 0, sizeof(MsgInfo));
     MsgInfo.pMsg = TestMessages[4];
     MsgInfo.MaxLen = strlen(TestMessages[4]);
-    Msg_ReadPublicCardsInfo(&MsgInfo, &PublicCards);
+    Msg_ReadCardsInfo(&MsgInfo, &PublicCards);
 
     memset(&MsgInfo, 0, sizeof(MsgInfo));
     MsgInfo.pMsg = TestMessages[5];
     MsgInfo.MaxLen = strlen(TestMessages[5]);
-    Msg_ReadPublicCardsInfo(&MsgInfo, &PublicCards);
+    Msg_ReadCardsInfo(&MsgInfo, &PublicCards);
 
     memset(&MsgInfo, 0, sizeof(MsgInfo));
     MsgInfo.pMsg = TestMessages[6];
     MsgInfo.MaxLen = strlen(TestMessages[6]);
-    Msg_ReadPublicCardsInfo(&MsgInfo, &PublicCards);
+    Msg_ReadCardsInfo(&MsgInfo, &PublicCards);
 
     Debug_PrintPublicChardInfo(&PublicCards);
+
+    /* 手牌解析 */
+    printf("test hold card info:\r\n");
+    memset(&MsgInfo, 0, sizeof(MsgInfo));
+    MsgInfo.pMsg = TestMessages[2];
+    MsgInfo.MaxLen = strlen(TestMessages[2]);
+    Msg_ReadCardsInfo(&MsgInfo, &HoldCards);
+
+    Debug_PrintPublicChardInfo(&HoldCards);
 
     return 0;
 }
