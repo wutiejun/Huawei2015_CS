@@ -184,8 +184,108 @@ typedef struct PLAYER_
 
 } PLAYER;
 
+typedef struct MSG_READ_INFO_
+{
+    const char * pMsg;
+    int MaxLen;
+    int Index;
+    void * pData;
+} MSG_READ_INFO;
+
+typedef struct MSG_NAME_TYPE_ENTRY_
+{
+    const char * pStartName;
+    const char * pEndtName;
+    SER_MSG_TYPES MsgType;
+} MSG_NAME_TYPE_ENTRY;
+
+typedef struct PLAYER_SEAT_INFO_
+{
+    char PlayerID[32];
+    PLAYER_SEAT_TYPES Type;
+    unsigned int Jetton;
+    unsigned int Money;
+} PLAYER_SEAT_INFO;
+
+typedef struct MSG_SEAT_INFO_
+{
+    int PlayerNum;
+    PLAYER_SEAT_INFO Players[8];
+} MSG_SEAT_INFO;
+
+typedef struct MSG_CARD_INFO_
+{
+    int CardNum;
+    CARD Cards[5];    /* 前3张公牌，第4张转牌，第5张河牌，如果是手牌，就只有两张 */
+} MSG_CARD_INFO;
+
+typedef struct MSG_POT_WIN_INFO_
+{
+    char PlayerID[32];
+    unsigned int Jetton;
+} MSG_POT_WIN_INFO;
+
+typedef struct MSG_POT_WIN_INFO_ MSG_PLAYER_BLIND_INFO;
+
+typedef struct MSG_BLIND_INFO_
+{
+    int BlindNum;
+    MSG_PLAYER_BLIND_INFO BlindPlayers[2];    /* 只有大小盲注 */
+} MSG_BLIND_INFO;
+
+typedef struct MSG_SHOWDWON_PLAYER_CARD_
+{
+    int Index;  /* 选手名次 */
+    char PlayerID[32];
+    CARD HoldCards[2];
+    char CardType[32];
+} MSG_SHOWDWON_PLAYER_CARD;
+
+typedef struct MSG_SHOWDWON_INFO_
+{
+    int PlayerNum;
+    CARD PublicCards[5];    /* 5张公牌 */
+    MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
+} MSG_SHOWDWON_INFO;
+
+typedef struct MSG_INQUIRE_PLAYER_ACTION_
+{
+    char PlayerID[32];
+    int Jetton;
+    int Money;
+    int Bet;
+    //char ActionName[32];
+    PLAYER_Action Action;
+} MSG_INQUIRE_PLAYER_ACTION;
+
+typedef struct MSG_INQUIRE_INFO_
+{
+    int PlayerNum;
+    int TotalPot;
+    MSG_INQUIRE_PLAYER_ACTION PlayerActions[8];
+} MSG_INQUIRE_INFO;
+
+#define MAX_INQUIRE_COUNT 32
+
+/* 每一局信息 */
+typedef struct RoundInfo_
+{
+    int RoundStatus;    /* 当前局状态 */
+    int InquireCount;
+    MSG_SEAT_INFO SeatInfo;
+    MSG_CARD_INFO PublicCards;
+    MSG_CARD_INFO HoldCards;
+    MSG_BLIND_INFO Blind;
+    MSG_SHOWDWON_INFO ShowDown;
+    MSG_POT_WIN_INFO PotWin;
+    MSG_INQUIRE_INFO Inquires[MAX_INQUIRE_COUNT];
+    /* 不需要notify消息，在inquire中已经全部有了 */
+} RoundInfo;
+
 /****************************************************************************************/
 SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
+
+SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound);
 
 const char * Msg_GetMsgNameByType(SER_MSG_TYPES Type);
 

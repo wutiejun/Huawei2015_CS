@@ -10,6 +10,8 @@
 
 int m_socket_id = -1;
 
+RoundInfo LocalRoundInfo = {0};
+
 bool server_msg_process(int size, const char* msg)
 {
     if (NULL != strstr(msg, "game-over"))
@@ -17,8 +19,15 @@ bool server_msg_process(int size, const char* msg)
         return false;
     }
 
-    //printf("get msg:\r\n");
+    SER_MSG_TYPES msg_type = Msg_Read(msg, size, NULL, &LocalRoundInfo);
 
+    if (msg_type == SER_MSG_TYPE_inquire)
+    {
+        const char* response = "check";
+        send(m_socket_id, response, (int)strlen(response)+1, 0);
+    }
+
+#if 0
     if (NULL != strstr(msg, "inquire/"))
     {
         //const char* response = "all_in";
@@ -27,6 +36,7 @@ bool server_msg_process(int size, const char* msg)
         //printf("get msg %d: %s", (int)type, Msg_GetMsgNameByType(type));
         send(m_socket_id, response, (int)strlen(response)+1, 0);
     }
+#endif
 
     return true;
 }

@@ -19,7 +19,7 @@ export "PLAYER4_ID"=1004
 
 LD_LIBRARY_PATH=/home/wutiejun/mytools/lib64/ ./gameserver -gip 127.0.0.1 -seq replay -r 30 -d 1 -m 10000 -b 50 -t 2000 -h 500 0</dev/null 1>/dev/null 2>/dev/null &
 
-./check 127.0.0.1 6000 127.0.0.1 6001 1001 &
+./game 127.0.0.1 6000 127.0.0.1 6001 1001  &
 
 ./check 127.0.0.1 6000 127.0.0.2 6002 1002 &
 

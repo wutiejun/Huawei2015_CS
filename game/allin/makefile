@@ -4,7 +4,7 @@ SUB_OBJS1=main.o card.o strategy.o analyse.o msg_reader.o
 
 SUB_OBJS2=msg_reader.o
 
-SUB_OBJS=$(SUB_OBJS2)
+SUB_OBJS=$(SUB_OBJS1)
 
 CPPFLAGS=-I../source
 

@@ -10,88 +10,7 @@
 
 /* 负责消息读取与解析 */
 
-typedef int (* Msg_LineReader)(char * pstrLine, int LineLen, void * pData);
-
-typedef struct MSG_READ_INFO_
-{
-    const char * pMsg;
-    int MaxLen;
-    int Index;
-    void * pData;
-} MSG_READ_INFO;
-
-typedef struct MSG_NAME_TYPE_ENTRY_
-{
-    const char * pStartName;
-    const char * pEndtName;
-    SER_MSG_TYPES MsgType;
-} MSG_NAME_TYPE_ENTRY;
-
-typedef struct PLAYER_SEAT_INFO_
-{
-    char PlayerID[32];
-    PLAYER_SEAT_TYPES Type;
-    unsigned int Jetton;
-    unsigned int Money;
-} PLAYER_SEAT_INFO;
-
-typedef struct MSG_SEAT_INFO_
-{
-    int PlayerNum;
-    PLAYER_SEAT_INFO Players[8];
-} MSG_SEAT_INFO;
-
-typedef struct MSG_CARD_INFO_
-{
-    int CardNum;
-    CARD Cards[5];    /* 前3张公牌，第4张转牌，第5张河牌，如果是手牌，就只有两张 */
-} MSG_CARD_INFO;
-
-typedef struct MSG_POT_WIN_INFO_
-{
-    char PlayerID[32];
-    unsigned int Jetton;
-} MSG_POT_WIN_INFO;
-
-typedef struct MSG_POT_WIN_INFO_ MSG_PLAYER_BLIND_INFO;
-
-typedef struct MSG_BLIND_INFO_
-{
-    int BlindNum;
-    MSG_PLAYER_BLIND_INFO BlindPlayers[2];    /* 只有大小盲注 */
-} MSG_BLIND_INFO;
-
-typedef struct MSG_SHOWDWON_PLAYER_CARD_
-{
-    int Index;  /* 选手名次 */
-    char PlayerID[32];
-    CARD HoldCards[2];
-    char CardType[32];
-} MSG_SHOWDWON_PLAYER_CARD;
-
-typedef struct MSG_SHOWDWON_INFO_
-{
-    int PlayerNum;
-    CARD PublicCards[5];    /* 5张公牌 */
-    MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
-} MSG_SHOWDWON_INFO;
-
-typedef struct MSG_INQUIRE_PLAYER_ACTION_
-{
-    char PlayerID[32];
-    int Jetton;
-    int Money;
-    int Bet;
-    //char ActionName[32];
-    PLAYER_Action Action;
-} MSG_INQUIRE_PLAYER_ACTION;
-
-typedef struct MSG_INQUIRE_INFO_
-{
-    int PlayerNum;
-    int TotalPot;
-    MSG_INQUIRE_PLAYER_ACTION PlayerActions[8];
-} MSG_INQUIRE_INFO;
+RoundInfo roundInfo = {0};
 
 MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
 {
@@ -462,6 +381,10 @@ void Msg_ReadPlayJettonInfo(MSG_POT_WIN_INFO * pPotWinInfo, char LineBuffer[256]
     /* "pot-win/ \n1001: 250 \n/pot-win \n", */
     sscanf(LineBuffer, "%s %d", pPotWinInfo->PlayerID, &pPotWinInfo->Jetton);
 
+    //printf("%s", LineBuffer);
+
+    //TRACE("%d \r\n", roundInfo.ShowDown.PlayerNum);
+
     ReadNum = strlen(pPotWinInfo->PlayerID);
     while (ReadNum >= 0)
     {
@@ -504,15 +427,16 @@ int Msg_ReadBlindInfo(MSG_READ_INFO *pMsgInfo, MSG_BLIND_INFO * pBlindInfo)
 
     while (memcmp(LineBuffer, "/blind", sizeof("/blind") - 1) != 0)
     {
-        //printf("Msg_ReadBlindInfo:%s", LineBuffer);
         memset(LineBuffer, 0, sizeof(LineBuffer));
         ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        if (memcmp(LineBuffer, "/blind", sizeof("/blind") - 1) == 0)
+        {
+            break;
+        }
         Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
         Msg_ReadPlayJettonInfo(&pBlindInfo->BlindPlayers[pBlindInfo->BlindNum], LineBuffer);
         pBlindInfo->BlindNum ++;
     }
-    /* 第一行是blind/，多加了一次，这里减掉 */
-    pBlindInfo->BlindNum --;
 
     //printf("%s[%d]\r\n", LineBuffer, pPotWinInfo->Jetton);
     return 0;
@@ -580,16 +504,23 @@ int Msg_ReadShowDownInfo(MSG_READ_INFO *pMsgInfo, MSG_SHOWDWON_INFO * pShowDown)
     ReadNum = pStart - pMsgInfo->pMsg;
     Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
 
+    //printf("%d\r\n", pShowDown->PlayerNum);
+
     while (memcmp(LineBuffer, "/showdown", sizeof("/showdown") - 1) != 0)
     {
         memset(LineBuffer, 0, sizeof(LineBuffer));
         ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        if (memcmp(LineBuffer, "/showdown", sizeof("/showdown") - 1) == 0)
+        {
+            break;
+        }
         //printf("%s", LineBuffer);
         Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
         Msg_ReadPlayerCardInfo(&pShowDown->Players[pShowDown->PlayerNum], LineBuffer);
         pShowDown->PlayerNum ++;
+        //printf("%d\r\n", pShowDown->PlayerNum);
     }
-    pShowDown->PlayerNum --;
+    //pShowDown->PlayerNum --;
     return 0;
 }
 
@@ -632,6 +563,10 @@ int Msg_ReadInquireInfo(MSG_READ_INFO *pMsgInfo, MSG_INQUIRE_INFO * pInquire)
         //printf("Msg_ReadBlindInfo:%s", LineBuffer);
         memset(LineBuffer, 0, sizeof(LineBuffer));
         ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        if (memcmp(LineBuffer, "total pot", sizeof("total pot") - 1) == 0)
+        {
+            break;
+        }
         Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
         pPlayerAction = &pInquire->PlayerActions[pInquire->PlayerNum];
         sscanf(LineBuffer, "%s %d %d %d %s",
@@ -652,7 +587,7 @@ int Msg_ReadInquireInfo(MSG_READ_INFO *pMsgInfo, MSG_INQUIRE_INFO * pInquire)
                GetActionName(pPlayerAction->Action));
         #endif
     }
-    pInquire->PlayerNum --;
+    //pInquire->PlayerNum --;
 
     /* 读取total pot */
     sscanf(LineBuffer, "total pot:%d", &pInquire->TotalPot);
@@ -673,35 +608,51 @@ const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
     }
 }
 
-/* 每一局信息 */
-typedef struct RoundInfo_
+SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound)
 {
-    int RoundStatus;    /* 当前局状态 */
-    MSG_SEAT_INFO SeatInfo;
-    MSG_CARD_INFO PublicCards;
-    MSG_BLIND_INFO Blind;
-    MSG_SHOWDWON_INFO ShowDown;
-    MSG_POT_WIN_INFO PotWin;
-} RoundInfo;
-
-int Msg_Read(char * pMsg, int MaxLen, void * pData, RoundInfo * pRound)
-{
+    int ret = 0;
     SER_MSG_TYPES Type = Msg_GetMsgType(pMsg, MaxLen);
     MSG_READ_INFO MsgInfo = {0};
 
     MsgInfo.pMsg = pMsg;
     MsgInfo.MaxLen = MaxLen;
 
+    //printf("get msg:%d %s\r\n", Type, Msg_GetMsgNameByType(Type));
     switch (Type)
     {
-        default: return 0;
         case SER_MSG_TYPE_seat_info:
-            return Msg_ReadSeatInfo(&MsgInfo, &pRound->SeatInfo);
+            ret = Msg_ReadSeatInfo(&MsgInfo, &pRound->SeatInfo);
+            break;
         case SER_MSG_TYPE_blind:
-            return Msg_ReadBlindInfo(&MsgInfo, &pRound->Blind);
+            ret = Msg_ReadBlindInfo(&MsgInfo, &pRound->Blind);
+            break;
+        case SER_MSG_TYPE_flop:
+            ret = Msg_ReadCardsInfo(&MsgInfo, &pRound->PublicCards);
+            break;
+        case SER_MSG_TYPE_turn:
+            ret = Msg_ReadCardsInfo(&MsgInfo, &pRound->PublicCards);
+            break;
+        case SER_MSG_TYPE_river:
+            ret = Msg_ReadCardsInfo(&MsgInfo, &pRound->PublicCards);
+            break;
+        case SER_MSG_TYPE_hold_cards:
+            ret = Msg_ReadCardsInfo(&MsgInfo, &pRound->HoldCards);
+            break;
+        case SER_MSG_TYPE_inquire:
+            ret = Msg_ReadInquireInfo(&MsgInfo, &pRound->Inquires[pRound->InquireCount]);
+            pRound->InquireCount = (pRound->InquireCount + 1) % MAX_INQUIRE_COUNT;
+            break;
+        case SER_MSG_TYPE_showdown:
+            ret = Msg_ReadShowDownInfo(&MsgInfo, &pRound->ShowDown);
+            break;
+        case SER_MSG_TYPE_pot_win:
+            Msg_ReadPotWinInfo(&MsgInfo, &pRound->PotWin);
+            break;
+        default:
+            break;
     }
-
-    return 0;
+    //TRACE("%d \r\n", pRound->ShowDown.PlayerNum);
+    return Type;
 }
 
 const char  * TestMessages[] =
@@ -742,8 +693,11 @@ void Debug_PrintPublicChardInfo(MSG_CARD_INFO * pPublicCard)
     }
     return;
 }
-
+#ifdef DEBUG
 int main(int argc, char * argv[])
+#else
+int main_ex(int argc, char * argv[])
+#endif
 {
     int count = sizeof(TestMessages)/sizeof(const char  *);
     SER_MSG_TYPES type = SER_MSG_TYPE_none;
@@ -752,10 +706,13 @@ int main(int argc, char * argv[])
     MSG_SEAT_INFO SeatInfo = {0};
     MSG_CARD_INFO PublicCards = {0};
 
+    printf("Round size is :%lu \r\n", sizeof(RoundInfo));
+
     for (index = 0; index < count; index++)
     {
-        type = Msg_GetMsgType(TestMessages[index], strlen(TestMessages[index]) + 1);
-        printf("Msg %d:%s", type, Msg_GetMsgNameByType(type));
+        //type = Msg_GetMsgType(TestMessages[index], strlen(TestMessages[index]) + 1);
+        Msg_Read(TestMessages[index], strlen(TestMessages[index]) + 1, NULL, &roundInfo);
+
     }
 
     /* 测试seat消息解析 */
