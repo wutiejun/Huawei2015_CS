@@ -76,6 +76,23 @@ typedef struct MSG_SHOWDWON_INFO_
     MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
 } MSG_SHOWDWON_INFO;
 
+typedef struct MSG_INQUIRE_PLAYER_ACTION_
+{
+    char PlayerID[32];
+    int Jetton;
+    int Money;
+    int Bet;
+    //char ActionName[32];
+    PLAYER_Action Action;
+} MSG_INQUIRE_PLAYER_ACTION;
+
+typedef struct MSG_INQUIRE_INFO_
+{
+    int PlayerNum;
+    int TotalPot;
+    MSG_INQUIRE_PLAYER_ACTION PlayerActions[8];
+} MSG_INQUIRE_INFO;
+
 MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
 {
     /***************************************************************************
@@ -576,6 +593,73 @@ int Msg_ReadShowDownInfo(MSG_READ_INFO *pMsgInfo, MSG_SHOWDWON_INFO * pShowDown)
     return 0;
 }
 
+PLAYER_Action GetAction(const char * ActionNAme)
+{
+    if (strcmp(ActionNAme, "call") == 0) return ACTION_call;
+    if (strcmp(ActionNAme, "check") == 0) return ACTION_check;
+    if (strcmp(ActionNAme, "raise") == 0) return ACTION_raise;
+    if (strcmp(ActionNAme, "fold") == 0) return ACTION_fold;
+    if (strcmp(ActionNAme, "allin") == 0) return ACTION_allin;
+    return ACTION_fold;
+}
+
+const char * GetActionName(PLAYER_Action act)
+{
+    const char * Actions[] = {"check", "all", "allin", "rais", "fold"};
+    return Actions[act];
+}
+
+/*
+inquire/ eol
+(pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
+total pot: num eol
+/inquire eol
+1003 1900 8000 100 blind
+*/
+int Msg_ReadInquireInfo(MSG_READ_INFO *pMsgInfo, MSG_INQUIRE_INFO * pInquire)
+{
+    char LineBuffer[256] = {0};
+    char Actions[32] = {0};
+    int ReadNum = 0;
+    MSG_INQUIRE_PLAYER_ACTION * pPlayerAction = NULL;
+
+    /* 先读取消息类型，第一行 inquire */
+    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+    Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+
+    while (memcmp(LineBuffer, "total pot", sizeof("total pot") - 1) != 0)
+    {
+        //printf("Msg_ReadBlindInfo:%s", LineBuffer);
+        memset(LineBuffer, 0, sizeof(LineBuffer));
+        ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
+        Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
+        pPlayerAction = &pInquire->PlayerActions[pInquire->PlayerNum];
+        sscanf(LineBuffer, "%s %d %d %d %s",
+               pPlayerAction->PlayerID,
+               &pPlayerAction->Jetton,
+               &pPlayerAction->Money,
+               &pPlayerAction->Bet,
+               Actions);
+        pPlayerAction->Action = GetAction(Actions);
+        pInquire->PlayerNum ++;
+
+        #if 0
+        printf("%s %d %d %d %s",
+                pPlayerAction->PlayerID,
+               pPlayerAction->Jetton,
+               pPlayerAction->Money,
+               pPlayerAction->Bet,
+               GetActionName(pPlayerAction->Action));
+        #endif
+    }
+    pInquire->PlayerNum --;
+
+    /* 读取total pot */
+    sscanf(LineBuffer, "total pot:%d", &pInquire->TotalPot);
+    //printf("totol pot [%d]\r\n", pInquire->TotalPot);
+    return 0;
+}
+
 /* 根据坐位类型返回坐位信息 */
 const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
 {
@@ -668,7 +752,6 @@ int main(int argc, char * argv[])
     MSG_SEAT_INFO SeatInfo = {0};
     MSG_CARD_INFO PublicCards = {0};
 
-
     for (index = 0; index < count; index++)
     {
         type = Msg_GetMsgType(TestMessages[index], strlen(TestMessages[index]) + 1);
@@ -759,6 +842,26 @@ int main(int argc, char * argv[])
                    GetCardPointName(pPlayerCard->HoldCards[1].Point),
                    pPlayerCard->CardType);
         }
+    }
+
+    {
+        /* for inquire msg */
+        MSG_INQUIRE_INFO Inquire = {0};
+        printf("test inquire info:\r\n");
+        memset(&MsgInfo, 0, sizeof(MsgInfo));
+        MsgInfo.pMsg = TestMessages[3];
+        MsgInfo.MaxLen = strlen(TestMessages[3]);
+        Msg_ReadInquireInfo(&MsgInfo, &Inquire);
+        for (index = 0; index < Inquire.PlayerNum; index ++)
+        {
+            printf("%s %d %d %d %s\r\n",
+                   Inquire.PlayerActions[index].PlayerID,
+                   Inquire.PlayerActions[index].Jetton,
+                   Inquire.PlayerActions[index].Money,
+                   Inquire.PlayerActions[index].Bet,
+                   GetActionName(Inquire.PlayerActions[index].Action));
+        }
+        printf("Total bet:%d\r\n", Inquire.TotalPot);
     }
 
     return 0;
