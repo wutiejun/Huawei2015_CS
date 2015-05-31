@@ -287,6 +287,8 @@ SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
 
 SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound);
 
+int Msg_CheckMsgByType(const char * pMsg, int MaxLen, SER_MSG_TYPES type);
+
 const char * Msg_GetMsgNameByType(SER_MSG_TYPES Type);
 
 /****************************************************************************************/

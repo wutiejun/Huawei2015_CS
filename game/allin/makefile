@@ -15,12 +15,12 @@ LDFLAGS=-lstdc++
 APP_NAME=game
 
 all:$(SUB_OBJS)
-	gcc -o $(APP_NAME) $(SUB_OBJS) $(LDFLAGS)
+	gcc -g -o $(APP_NAME) $(SUB_OBJS) $(LDFLAGS)
 
 clean:
 	rm -f $(APP_NAME)
 	rm -f $(SUB_OBJS)
 
 %.o: %.cpp \
-	g++ $(CPPFLAGS) -c $^ -o $@;
+	g++ -g -fpic $(CPPFLAGS) -c $^ -o $@;
 
