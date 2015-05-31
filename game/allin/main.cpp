@@ -6,11 +6,101 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "pthread.h"
+#include <errno.h>
 #include "Player.h"
 
 int m_socket_id = -1;
 int total_round = 0;
 RoundInfo LocalRoundInfo = {0};
+
+typedef struct msg_queue_entry_
+{
+    struct msg_queue_entry_ * pNextMsg;
+    int MsgSize;
+    void * pMsg;
+} msg_queue_entry;
+
+typedef struct msg_queue_
+{
+    int MsgCount;
+    int exit;
+    pthread_mutex_t Lock;
+    msg_queue_entry * pFirstMsg;
+    msg_queue_entry * pLastMsg;
+} msg_queue;
+
+msg_queue g_msg_queue;
+
+void MsgQueueInit(void)
+{
+    memset(&g_msg_queue, 0, sizeof(0));
+    pthread_mutex_init(&g_msg_queue.Lock, NULL);
+    return;
+}
+
+void MsgQueueAdd(const char * pMsg, int size)
+{
+    msg_queue_entry *pNewMsg = NULL;
+    do
+    {
+        pNewMsg = (msg_queue_entry *)malloc(sizeof(msg_queue_entry) + size);
+        if (pNewMsg == NULL)
+        {
+            TRACE("%lu %d\r\n", sizeof(msg_queue_entry) + size, errno);
+            usleep(1000);
+        }
+    } while (pNewMsg == NULL);
+
+    while (g_msg_queue.MsgCount > 100)
+    {
+        TRACE("%d\r\n", g_msg_queue.MsgCount);
+        usleep(1000);
+    }
+
+    memset(pNewMsg, 0, sizeof(msg_queue_entry) + size);
+
+    pNewMsg->pMsg = pNewMsg + 1;
+    pNewMsg->MsgSize = size;
+    pNewMsg->pNextMsg = NULL;
+    memcpy(pNewMsg->pMsg, pMsg, size);
+
+    //printf("Add msg 0x%p %d;\r\n", pNewMsg, size);
+
+    pthread_mutex_lock(&g_msg_queue.Lock);
+    if (g_msg_queue.MsgCount == 0)
+    {
+        /* 两个必然同时为空 */
+        g_msg_queue.pFirstMsg = pNewMsg;
+    }
+    else
+    {
+        g_msg_queue.pLastMsg->pNextMsg = pNewMsg;
+    }
+    g_msg_queue.pLastMsg = pNewMsg;
+    g_msg_queue.MsgCount ++;
+    pthread_mutex_unlock(&g_msg_queue.Lock);
+    return;
+}
+
+msg_queue_entry * MsgQueueGet(void)
+{
+    msg_queue_entry *pMsg = NULL;
+    pthread_mutex_lock(&g_msg_queue.Lock);
+    if (g_msg_queue.MsgCount > 0)
+    {
+        pMsg = g_msg_queue.pFirstMsg;
+        g_msg_queue.pFirstMsg = g_msg_queue.pFirstMsg->pNextMsg;
+        if (g_msg_queue.pFirstMsg == NULL)
+        {
+            g_msg_queue.pLastMsg = NULL;
+        }
+        g_msg_queue.MsgCount --;
+    }
+    pthread_mutex_unlock(&g_msg_queue.Lock);
+    return pMsg;
+}
+
 
 bool server_msg_process(int size, const char* msg)
 {
@@ -53,8 +143,38 @@ bool server_msg_process(int size, const char* msg)
     return true;
 }
 
- #include <signal.h>
- #include <execinfo.h>
+void * MsgProcessThread(void *pArgs)
+{
+    msg_queue_entry * pMsg = NULL;
+    int ret = 0;
+
+    while (1)
+    {
+        pMsg = MsgQueueGet();
+        if (pMsg == NULL)
+        {
+            usleep(1000);
+            continue;
+        }
+
+        //printf("Get msg 0x%p %d;\r\n", pMsg, pMsg->MsgSize);
+
+        ret = server_msg_process(pMsg->MsgSize, (const char *)pMsg->pMsg);
+        free(pMsg);
+        pMsg = NULL;
+        if (ret == false)
+        {
+            break;
+        }
+    }
+
+    g_msg_queue.exit = true;
+
+    return NULL;
+}
+
+#include <signal.h>
+#include <execinfo.h>
 
  void OnSigSem(int signal)
  {
@@ -118,6 +238,9 @@ int ReceiveMsg(char buffer[1024])
 
 int main(int argc, char* argv[])
 {
+    int ret = 0;
+    pthread_t subThread;
+
     if(argc != 6)
     {
         return -1;
@@ -169,25 +292,38 @@ int main(int argc, char* argv[])
     {
         usleep(100*1000);
     };
-    printf("connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+    printf("game connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
 
     /* 向server注册 */
     char reg_msg[50]="";
     snprintf(reg_msg, sizeof(reg_msg) - 1, "reg: %d %s \n", my_id, my_name);
     send(m_socket_id, reg_msg, (int)strlen(reg_msg)+1, 0);
 
+    /* 创建处理线程 */
+    MsgQueueInit();
+
+    ret = pthread_create(&subThread, NULL, MsgProcessThread, NULL);
+    if (ret == -1)
+    {
+        printf("pthread_create error!%d \r\n", errno);
+    }
+
+    pthread_detach(subThread);
+
+    g_msg_queue.exit = false;
+
+    TRACE("%d\r\n", g_msg_queue.exit);
+
     /* 开始游戏 */
-    while(1)
+    while(g_msg_queue.exit == false)
     {
         char buffer[1024] = {'\0'};
-        //int size = recv(m_socket_id, buffer, sizeof(buffer) - 1, 0);
-        int size = ReceiveMsg(buffer);
+        int size = recv(m_socket_id, buffer, sizeof(buffer) - 1, 0);
+        //TRACE("%d\r\n", size);
+        //int size = ReceiveMsg(buffer);
         if (size > 0)
         {
-            if (!server_msg_process(size, buffer))
-            {
-                break;
-            }
+            MsgQueueAdd(buffer, size);
         }
     }
 

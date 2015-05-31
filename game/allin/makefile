@@ -10,17 +10,17 @@ CPPFLAGS=-I../source
 
 #LDFLAGS=-L../libs -labc -ldef
 
-LDFLAGS=-lstdc++
+LDFLAGS=-lstdc++ -lpthread
 
 APP_NAME=game
 
 all:$(SUB_OBJS)
-	gcc -g -o $(APP_NAME) $(SUB_OBJS) $(LDFLAGS)
+	gcc -o $(APP_NAME) $(SUB_OBJS) $(LDFLAGS)
 
 clean:
 	rm -f $(APP_NAME)
 	rm -f $(SUB_OBJS)
 
 %.o: %.cpp \
-	g++ -g -fpic $(CPPFLAGS) -c $^ -o $@;
+	g++ -Wall -g -fpic $(CPPFLAGS) -c $^ -o $@;
 
