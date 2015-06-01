@@ -192,12 +192,6 @@ typedef struct MSG_READ_INFO_
     void * pData;
 } MSG_READ_INFO;
 
-typedef struct MSG_NAME_TYPE_ENTRY_
-{
-    const char * pStartName;
-    const char * pEndtName;
-    SER_MSG_TYPES MsgType;
-} MSG_NAME_TYPE_ENTRY;
 
 typedef struct PLAYER_SEAT_INFO_
 {
@@ -271,6 +265,7 @@ typedef struct MSG_INQUIRE_INFO_
 typedef struct RoundInfo_
 {
     int RoundStatus;    /* 当前局状态 */
+    int ReadType;
     int InquireCount;
     MSG_SEAT_INFO SeatInfo;
     MSG_CARD_INFO PublicCards;
@@ -281,6 +276,18 @@ typedef struct RoundInfo_
     MSG_INQUIRE_INFO Inquires[MAX_INQUIRE_COUNT];
     /* 不需要notify消息，在inquire中已经全部有了 */
 } RoundInfo;
+
+
+typedef void (* MSG_LineReader)(char Buffer[256], RoundInfo * pArg);
+
+typedef struct MSG_NAME_TYPE_ENTRY_
+{
+    const char * pStartName;
+    const char * pEndtName;
+    int NameLen;
+    SER_MSG_TYPES MsgType;
+    MSG_LineReader LinerReader;
+} MSG_NAME_TYPE_ENTRY;
 
 /****************************************************************************************/
 SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);

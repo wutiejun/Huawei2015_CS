@@ -7,12 +7,36 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "pthread.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <errno.h>
 #include "Player.h"
 
+int log_file = -1;
 int m_socket_id = -1;
 int total_round = 0;
+int total_msg = 0;
 RoundInfo LocalRoundInfo = {0};
+
+void WriteLog(const char * Msg, int size)
+{
+    static int msg_num = 0;
+    int buf_len = 0;
+    char Buffer[32] = {0};
+    msg_num ++;
+    if (log_file == -1)
+    {
+        log_file = open("./msg_log.log", O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
+    }
+    buf_len = sprintf(Buffer, "====%d====\r\n", msg_num);
+    printf(Buffer);
+    write(log_file, Buffer, buf_len);
+    printf(Msg);
+    write(log_file, Msg, size);
+    return;
+}
 
 typedef struct msg_queue_entry_
 {
@@ -48,15 +72,9 @@ void MsgQueueAdd(const char * pMsg, int size)
         if (pNewMsg == NULL)
         {
             TRACE("%lu %d\r\n", sizeof(msg_queue_entry) + size, errno);
-            usleep(1000);
+            return;
         }
     } while (pNewMsg == NULL);
-
-    while (g_msg_queue.MsgCount > 100)
-    {
-        TRACE("%d\r\n", g_msg_queue.MsgCount);
-        usleep(1000);
-    }
 
     memset(pNewMsg, 0, sizeof(msg_queue_entry) + size);
 
@@ -101,6 +119,10 @@ msg_queue_entry * MsgQueueGet(void)
     return pMsg;
 }
 
+void Debug_PrintRoundInfo(RoundInfo * pRound)
+{
+
+}
 
 bool server_msg_process(int size, const char* msg)
 {
@@ -114,7 +136,7 @@ bool server_msg_process(int size, const char* msg)
     if (Type == SER_MSG_TYPE_seat_info)
     {
         total_round ++;
-        printf("Start new round %d!\r\n", total_round);
+        printf("Start new round %d/%d!\r\n", total_round, total_msg);
         //Msg_SaveRoundMsg(&LocalRoundInfo);
         memset(&LocalRoundInfo, 0, sizeof(RoundInfo));
     }
@@ -128,17 +150,6 @@ bool server_msg_process(int size, const char* msg)
         const char* response = "check";
         send(m_socket_id, response, sizeof("check"), 0);
     }
-
-#if 0
-    if (NULL != strstr(msg, "inquire/"))
-    {
-        //const char* response = "all_in";
-        //SER_MSG_TYPES type = Msg_GetMsgType(msg, size);
-        const char* response = "check";
-        //printf("get msg %d: %s", (int)type, Msg_GetMsgNameByType(type));
-        send(m_socket_id, response, (int)strlen(response)+1, 0);
-    }
-#endif
 
     return true;
 }
@@ -312,7 +323,7 @@ int main(int argc, char* argv[])
 
     g_msg_queue.exit = false;
 
-    TRACE("%d\r\n", g_msg_queue.exit);
+    //TRACE("%d\r\n", g_msg_queue.exit);
 
     /* ¿ªÊ¼ÓÎÏ· */
     while(g_msg_queue.exit == false)
@@ -323,7 +334,9 @@ int main(int argc, char* argv[])
         //int size = ReceiveMsg(buffer);
         if (size > 0)
         {
+            WriteLog(buffer, size);
             MsgQueueAdd(buffer, size);
+            total_msg ++;
         }
     }
 
