@@ -31,9 +31,9 @@ void WriteLog(const char * Msg, int size)
         log_file = open("./msg_log.log", O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
     }
     buf_len = sprintf(Buffer, "====%d====\r\n", msg_num);
-    printf(Buffer);
+    //printf(Buffer);
     write(log_file, Buffer, buf_len);
-    printf(Msg);
+    //printf(Msg);
     write(log_file, Msg, size);
     return;
 }
@@ -141,11 +141,13 @@ bool server_msg_process(int size, const char* msg)
         memset(&LocalRoundInfo, 0, sizeof(RoundInfo));
     }
 
-    SER_MSG_TYPES msg_type = Msg_Read(msg, size, NULL, &LocalRoundInfo);
+    //SER_MSG_TYPES msg_type = Msg_Read(msg, size, NULL, &LocalRoundInfo);
+
+    Msg_Read_Ex(msg, size, &LocalRoundInfo);
 
     //printf("Msg_Read:%d:%s\r\n", msg_type, Msg_GetMsgNameByType(msg_type));
 
-    if (msg_type == SER_MSG_TYPE_inquire)
+    if (LocalRoundInfo.RoundStatus == SER_MSG_TYPE_inquire)
     {
         const char* response = "check";
         send(m_socket_id, response, sizeof("check"), 0);

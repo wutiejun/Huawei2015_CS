@@ -6,6 +6,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "pthread.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <errno.h>
 #include "Player.h"
 
 /* 负责处理策略 */
@@ -30,6 +36,16 @@ typedef struct STG_DATA_
 
 STG_DATA g_stg;
 
+static void STG_Lock(void)
+{
+    pthread_mutex_lock(&g_stg.Lock);
+}
+
+static void STG_Unlock(void)
+{
+    pthread_mutex_lock(&g_stg.Lock);
+}
+
 void STG_Init(void)
 {
 
@@ -38,9 +54,11 @@ void STG_Init(void)
 
 void STG_SaveRoundData(RoundInfo * pRoundInfo)
 {
-
+    STG_Lock();
+    memcpy(&g_stg.Rounds[g_stg.StgIndex], pRoundInfo, sizeof(RoundInfo));
+    g_stg.StgIndex ++;
+    STG_Unlock();
     return;
-
 }
 
 

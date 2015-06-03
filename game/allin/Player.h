@@ -237,8 +237,9 @@ typedef struct MSG_SHOWDWON_PLAYER_CARD_
 
 typedef struct MSG_SHOWDWON_INFO_
 {
+    int CardNum;
     int PlayerNum;
-    CARD PublicCards[5];    /* 5张公牌 */
+    CARD PublicCards[5];                    /* 5张公牌 */
     MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
 } MSG_SHOWDWON_INFO;
 
@@ -293,6 +294,8 @@ typedef struct MSG_NAME_TYPE_ENTRY_
 SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
 
 SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound);
+
+void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound);
 
 int Msg_CheckMsgByType(const char * pMsg, int MaxLen, SER_MSG_TYPES type);
 

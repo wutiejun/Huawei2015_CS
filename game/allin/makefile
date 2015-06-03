@@ -20,7 +20,12 @@ all:$(SUB_OBJS)
 clean:
 	rm -f $(APP_NAME)
 	rm -f $(SUB_OBJS)
+	rm -f test
+test:
+	gcc -DDEBUG -g -o test msg_reader.cpp
 
 %.o: %.cpp \
 	g++ -Wall -g -fpic $(CPPFLAGS) -c $^ -o $@;
+
+
 
