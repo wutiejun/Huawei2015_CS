@@ -12,6 +12,7 @@
 
 RoundInfo roundInfo = {0};
 
+void Debug_PrintChardInfo(CARD * pCard, int CardNum);
 void Msg_LinerReader_Seat(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_Blind(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_Hold(char Buffer[256], RoundInfo * pArg);
@@ -848,9 +849,48 @@ void Msg_LinerReader_Turn(char Buffer[256], RoundInfo * pRound)
     return;
 }
 
+const char *Msg_GetCardTypeName(CARD_TYPES Type)
+{
+    const char * TypeNames[] =
+    {
+        "CARD_TYPES_None",
+        "CARD_TYPES_High",
+        "CARD_TYPES_OnePair",
+        "CARD_TYPES_TwoPair",
+        "CARD_TYPES_Three_Of_A_Kind",
+        "CARD_TYPES_Straight",
+        "CARD_TYPES_Flush",
+        "CARD_TYPES_Full_House",
+        "CARD_TYPES_Four_Of_A_Kind",
+        "CARD_TYPES_Straight_Flush",
+        "CARD_TYPES_Royal_Flush",
+    };
+    return TypeNames[Type];
+}
+
 void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 {
+    CARD AllCards[7];
+    CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    CARD_TYPES Type = CARD_TYPES_None;
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
+
+    AllCards[0] = pRound->PublicCards.Cards[0];
+    AllCards[1] = pRound->PublicCards.Cards[1];
+    AllCards[2] = pRound->PublicCards.Cards[2];
+    AllCards[3] = pRound->PublicCards.Cards[3];
+    AllCards[4] = pRound->PublicCards.Cards[4];
+    AllCards[5] = pRound->HoldCards.Cards[0];
+    AllCards[6] = pRound->HoldCards.Cards[1];
+
+    //Debug_PrintChardInfo(&pRound->PublicCards);
+    //Debug_PrintChardInfo(&pRound->HoldCards);
+
+    Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
+    Debug_PrintChardInfo(AllCards, 7);
+
+    printf("Type %s, Max:%d\r\n", Msg_GetCardTypeName(Type), MaxPoint[Type]);
+
     return;
 }
 
@@ -979,16 +1019,15 @@ void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
     return;
 }
 
-void Debug_PrintChardInfo(MSG_CARD_INFO * pPublicCard)
+void Debug_PrintChardInfo(CARD * pCard, int CardNum)
 {
     int index = 0;
-    CARD * pCard = NULL;
     printf("Card Info:\r\n");
-    for (index = 0; index < pPublicCard->CardNum; index ++)
+    for (index = 0; index < CardNum; index ++)
     {
-        pCard = &pPublicCard->Cards[index];
         printf("card_%d %s %s\n", index, GetCardColorName(pCard),
                GetCardPointName(pCard->Point));
+        pCard ++;
     }
     return;
 }
@@ -1055,7 +1094,7 @@ int main_ex(int argc, char * argv[])
     Msg_Read_Ex(TestMessages[10], strlen(TestMessages[10]), &roundInfo);
     Debug_PrintSeatInfo(&roundInfo.SeatInfo);
     Debug_PrintBlindInfo(&roundInfo.Blind);
-    Debug_PrintChardInfo(&roundInfo.HoldCards);
+    Debug_PrintChardInfo(roundInfo.HoldCards.Cards, 2);
     //
     printf("========show down============\r\n");
     Msg_Read_Ex(TestMessages[7], strlen(TestMessages[7]), &roundInfo);
@@ -1075,10 +1114,10 @@ int main_ex(int argc, char * argv[])
     Msg_Read_Ex(TestMessages[4], strlen(TestMessages[4]), &roundInfo);
     Msg_Read_Ex(TestMessages[5], strlen(TestMessages[5]), &roundInfo);
     Msg_Read_Ex(TestMessages[6], strlen(TestMessages[6]), &roundInfo);
-    Debug_PrintChardInfo(&roundInfo.PublicCards);
+    Debug_PrintChardInfo(roundInfo.PublicCards.Cards, 5);
 
     Msg_Read_Ex(TestMessages[2], strlen(TestMessages[2]), &roundInfo);
-    Debug_PrintChardInfo(&roundInfo.HoldCards);
+    Debug_PrintChardInfo(roundInfo.HoldCards.Cards, 2);
 
     MsgInfo.pMsg = TestMessages[0];
     MsgInfo.MaxLen = strlen(TestMessages[0]);
@@ -1104,7 +1143,7 @@ int main_ex(int argc, char * argv[])
     MsgInfo.MaxLen = strlen(TestMessages[6]);
     Msg_ReadCardsInfo_River(&MsgInfo, &PublicCards);
 
-    Debug_PrintChardInfo(&PublicCards);
+    Debug_PrintChardInfo(PublicCards.Cards, 5);
 
     /*  ÷≈∆Ω‚Œˆ */
     {
@@ -1114,7 +1153,7 @@ int main_ex(int argc, char * argv[])
         MsgInfo.pMsg = TestMessages[2];
         MsgInfo.MaxLen = strlen(TestMessages[2]);
         Msg_ReadCardsInfo_Hold(&MsgInfo, &HoldCards);
-        Debug_PrintChardInfo(&HoldCards);
+        Debug_PrintChardInfo(HoldCards.Cards, 2);
     }
 
     {

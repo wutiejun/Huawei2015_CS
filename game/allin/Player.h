@@ -67,6 +67,7 @@ typedef enum CARD_TYPES_
     CARD_TYPES_Four_Of_A_Kind,
     CARD_TYPES_Straight_Flush,
     CARD_TYPES_Royal_Flush,
+    CARD_TYPES_Butt,
 } CARD_TYPES;
 
 /* 根据游戏流程定义的各种消息类型 */
@@ -300,6 +301,8 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound);
 int Msg_CheckMsgByType(const char * pMsg, int MaxLen, SER_MSG_TYPES type);
 
 const char * Msg_GetMsgNameByType(SER_MSG_TYPES Type);
+
+CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD_TYPES_Butt]);
 
 /****************************************************************************************/
 

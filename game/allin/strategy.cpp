@@ -14,6 +14,8 @@
 #include <errno.h>
 #include "Player.h"
 
+#define MAX_ROUND_COUNT 2000
+
 /* 负责处理策略 */
 
 /* 各类牌出现的机率 */
@@ -27,14 +29,28 @@ double g_CardTypeRate_2[CARD_TYPES_Royal_Flush + 1] =
     0, 1/1.002, 1/1.25, 1/20, 1/46, 1/254, 1/508, 1/693, 1/4164, 1/64973, 1/649739
 };
 
+/* 赢牌类型 */
+typedef struct STG_WIN_CARDS_
+{
+    int ShowTimes;
+    int WinTimes;
+    CARD_TYPES WinType;     /* 赢牌的类型 */
+    CARD_POINT MaxPoint;    /* 赢牌的最大点数 */
+    CARD_POINT SedPoint;    /* 赢牌的次大点数 */
+} STG_WIN_CARDS;
+
 typedef struct STG_DATA_
 {
     int StgIndex;
     pthread_mutex_t Lock;
-    RoundInfo Rounds[1024]; /* 13M */
+    RoundInfo Rounds[MAX_ROUND_COUNT]; /* 20M */
+
+    /* 动态加载赢牌的数据 */
+    int WinNum;
+    STG_WIN_CARDS * pAllWinCards;
 } STG_DATA;
 
-STG_DATA g_stg;
+STG_DATA g_stg = {0};
 
 static void STG_Lock(void)
 {
@@ -48,17 +64,149 @@ static void STG_Unlock(void)
 
 void STG_Init(void)
 {
-
+    /* 加载学习数据 */
+    //STG_LoadStudyData();
+    pthread_mutex_init(&g_stg.Lock, NULL);
     return;
+}
+
+void STG_SortCardByPoint(CARD * Cards, int CardNum)
+{
+    int i = 0;
+    int j = 0;
+    CARD TempCard;
+
+    for (i = 0; i < CardNum; i ++)
+    {
+        for (j = i + 1; j < CardNum; j ++)
+        {
+            if (Cards[j].Point > Cards[i].Point)
+            {
+                TempCard = Cards[i];
+                Cards[i] = Cards[j];
+                Cards[j] = TempCard;
+            }
+        }
+    }
+    return;
+}
+
+/* 判断两个手牌是否有相同的点数 */
+bool STG_IsTwoHoldCardHasSamePoint(CARD CardsA[2], CARD CardsB[2])
+{
+    STG_SortCardByPoint(CardsA, 2);
+    STG_SortCardByPoint(CardsB, 2);
+    if (   (CardsA[0].Point == CardsB[0].Point)
+        && (CardsA[1].Point == CardsB[1].Point))
+    {
+        return true;
+    }
+    return false;
 }
 
 void STG_SaveRoundData(RoundInfo * pRoundInfo)
 {
     STG_Lock();
     memcpy(&g_stg.Rounds[g_stg.StgIndex], pRoundInfo, sizeof(RoundInfo));
-    g_stg.StgIndex ++;
+    g_stg.StgIndex = (g_stg.StgIndex + 1) % MAX_ROUND_COUNT;
     STG_Unlock();
     return;
+}
+
+/* 根据不同的牌数，计算牌的类型 */
+CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD_TYPES_Butt])
+{
+    int AllPoints[CARD_POINTT_A + 1] = {0};
+    int AllColors[CARD_COLOR_SPADES + 1] = {0};
+    //CARD_POINT MaxPoints[CARD_TYPES + 1] = {0};
+    int index = 0;
+    int Pairs = 0;
+    int Three = 0;
+    int Four = 0;
+    int Straight = 0;
+    CARD_TYPES CardType = CARD_TYPES_High;
+    CARD_TYPES ColorType = CARD_TYPES_None;
+
+    STG_SortCardByPoint(pCards, CardNum);
+
+    /* 单牌最大的就是最后一张 */
+    MaxPoints[CARD_TYPES_High] = pCards[0].Point;
+
+    for (index = 0; index < CardNum; index ++)
+    {
+        AllColors[pCards[index].Color] ++;
+        AllPoints[pCards[index].Point] ++;
+        if (AllColors[pCards[index].Color] >= 5)
+        {
+            /* 记录同花，同花顺，皇家同花顺的最大点数 */
+            MaxPoints[CARD_TYPES_Flush] = pCards[index].Point;
+            MaxPoints[CARD_TYPES_Straight_Flush] = pCards[index].Point;
+            MaxPoints[CARD_TYPES_Royal_Flush] = pCards[index].Point;
+            ColorType = CARD_TYPES_Flush;
+        }
+    }
+
+    for (index = CARD_POINTT_2; index < CARD_POINTT_A + 1; index ++)
+    {
+        switch (AllPoints[index])
+        {
+        case 1:
+            Straight ++;
+            if (Straight >= 5)
+            {
+                MaxPoints[CARD_TYPES_Straight] = (CARD_POINT)index;
+                CardType = CARD_TYPES_Straight;
+                if (ColorType == CARD_TYPES_Flush)
+                {
+                    CardType = CARD_TYPES_Straight_Flush;
+                    if (MaxPoints[CARD_TYPES_Royal_Flush] == CARD_POINTT_A)
+                    {
+                        CardType = CARD_TYPES_Royal_Flush;
+                    }
+                }
+            }
+            break;
+        case 2:
+            Pairs ++;
+            MaxPoints[CARD_TYPES_OnePair] = (CARD_POINT)index;
+            CardType = CARD_TYPES_OnePair;
+            if (Pairs >= 2)
+            {
+                MaxPoints[CARD_TYPES_TwoPair] = (CARD_POINT)index;
+                CardType = CARD_TYPES_TwoPair;
+            }
+            break;
+        case 3:
+            Three ++;
+            MaxPoints[CARD_TYPES_Three_Of_A_Kind] = (CARD_POINT)index;
+            CardType = CARD_TYPES_Three_Of_A_Kind;
+            if (Pairs >= 1)
+            {
+                MaxPoints[CARD_TYPES_Full_House] = (CARD_POINT)index;
+                CardType = CARD_TYPES_Full_House;
+            }
+            break;
+        case 4:
+            Four ++;
+            MaxPoints[CARD_TYPES_Four_Of_A_Kind] = (CARD_POINT)index;
+            CardType = CARD_TYPES_Four_Of_A_Kind;
+            break;
+        default:
+            Straight = 0;
+            break;
+        }
+    }
+
+    /* 特殊的顺子，A,2,3,4,5 */
+    #if 0
+    if ()
+    {
+        CardType = CARD_TYPES_Straight;
+    }
+    #endif
+
+    return CardType;
+
 }
 
 
