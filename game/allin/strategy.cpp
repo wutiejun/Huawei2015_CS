@@ -18,17 +18,6 @@
 
 /* 负责处理策略 */
 
-/* 各类牌出现的机率 */
-double g_CardTypeRate_1[CARD_TYPES_Royal_Flush + 1] =
-{
-    0, 1/1.002, 1/1.25, 1/20, 1/46, 1/254, 1/508, 1/693, 1/4164, 1/64973, 1/649739
-};
-
-double g_CardTypeRate_2[CARD_TYPES_Royal_Flush + 1] =
-{
-    0, 1/1.002, 1/1.25, 1/20, 1/46, 1/254, 1/508, 1/693, 1/4164, 1/64973, 1/649739
-};
-
 /* 赢牌类型 */
 typedef struct STG_WIN_CARDS_
 {
@@ -41,13 +30,15 @@ typedef struct STG_WIN_CARDS_
 
 typedef struct STG_DATA_
 {
-    int StgIndex;
+    int RunningFlag;
+    int StgWriteIndex;
+    int StgReadIndex;
+
     pthread_mutex_t Lock;
     RoundInfo Rounds[MAX_ROUND_COUNT]; /* 20M */
 
-    /* 动态加载赢牌的数据 */
-    int WinNum;
-    STG_WIN_CARDS * pAllWinCards;
+    /* 赢牌的数据 */
+    STG_WIN_CARDS AllWinCards[CARD_TYPES_Butt][CARD_POINTT_BUTT];
 } STG_DATA;
 
 STG_DATA g_stg = {0};
@@ -62,11 +53,77 @@ static void STG_Unlock(void)
     pthread_mutex_lock(&g_stg.Lock);
 }
 
+void STG_LoadStudyData(void)
+{
+    int fid = -1;
+    int read_size = 0;
+
+    memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
+
+    fid = open("game_win_data.bin", O_WRONLY);
+    if (fid == -1)
+    {
+        return;
+    }
+
+    read_size = read(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
+    if (read_size != sizeof(g_stg.AllWinCards))
+    {
+        memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
+    }
+    close(fid);
+    return;
+}
+
+void STG_SaveStudyData(void)
+{
+    int fid = -1;
+    fid = open("game_win_data.bin", O_CREAT|O_WRONLY|O_TRUNC|O_SYNC);
+    if (fid == -1)
+    {
+        return;
+    }
+    write(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
+    close(fid);
+    return;
+}
+
+void * STG_ProcessThread(void *pArgs)
+{
+    int ret = 0;
+    while (g_stg.RunningFlag)
+    {
+        STG_Lock();
+
+        STG_Unlock();
+    }
+    return NULL;
+}
+
 void STG_Init(void)
 {
+    int ret;
+    pthread_t subThread;
+
     /* 加载学习数据 */
-    //STG_LoadStudyData();
+    STG_LoadStudyData();
+    g_stg.RunningFlag = true;
     pthread_mutex_init(&g_stg.Lock, NULL);
+
+    ret = pthread_create(&subThread, NULL, STG_ProcessThread, NULL);
+    if (ret == -1)
+    {
+        printf("STG_Init pthread_create error!%d \r\n", errno);
+    }
+
+    pthread_detach(subThread);
+    return;
+}
+
+void STG_Dispose(void)
+{
+    g_stg.RunningFlag = false;
+    STG_Lock();
     return;
 }
 
@@ -80,7 +137,7 @@ void STG_SortCardByPoint(CARD * Cards, int CardNum)
     {
         for (j = i + 1; j < CardNum; j ++)
         {
-            if (Cards[j].Point > Cards[i].Point)
+            if (Cards[j].Point < Cards[i].Point)
             {
                 TempCard = Cards[i];
                 Cards[i] = Cards[j];
@@ -107,8 +164,8 @@ bool STG_IsTwoHoldCardHasSamePoint(CARD CardsA[2], CARD CardsB[2])
 void STG_SaveRoundData(RoundInfo * pRoundInfo)
 {
     STG_Lock();
-    memcpy(&g_stg.Rounds[g_stg.StgIndex], pRoundInfo, sizeof(RoundInfo));
-    g_stg.StgIndex = (g_stg.StgIndex + 1) % MAX_ROUND_COUNT;
+    memcpy(&g_stg.Rounds[g_stg.StgWriteIndex], pRoundInfo, sizeof(RoundInfo));
+    g_stg.StgWriteIndex = (g_stg.StgWriteIndex + 1) % MAX_ROUND_COUNT;
     STG_Unlock();
     return;
 }
@@ -118,7 +175,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
 {
     int AllPoints[CARD_POINTT_A + 1] = {0};
     int AllColors[CARD_COLOR_SPADES + 1] = {0};
-    //CARD_POINT MaxPoints[CARD_TYPES + 1] = {0};
     int index = 0;
     int Pairs = 0;
     int Three = 0;
@@ -130,7 +186,7 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     STG_SortCardByPoint(pCards, CardNum);
 
     /* 单牌最大的就是最后一张 */
-    MaxPoints[CARD_TYPES_High] = pCards[0].Point;
+    MaxPoints[CARD_TYPES_High] = pCards[CardNum - 1].Point;
 
     for (index = 0; index < CardNum; index ++)
     {
@@ -154,19 +210,15 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
             Straight ++;
             if (Straight >= 5)
             {
-                MaxPoints[CARD_TYPES_Straight] = (CARD_POINT)index;
-                CardType = CARD_TYPES_Straight;
-                if (ColorType == CARD_TYPES_Flush)
-                {
-                    CardType = CARD_TYPES_Straight_Flush;
-                    if (MaxPoints[CARD_TYPES_Royal_Flush] == CARD_POINTT_A)
-                    {
-                        CardType = CARD_TYPES_Royal_Flush;
-                    }
-                }
+                goto Straight;
             }
             break;
         case 2:
+            Straight ++;
+            if (Straight >= 5)
+            {
+                goto Straight;
+            }
             Pairs ++;
             MaxPoints[CARD_TYPES_OnePair] = (CARD_POINT)index;
             CardType = CARD_TYPES_OnePair;
@@ -177,6 +229,11 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
             }
             break;
         case 3:
+            Straight ++;
+            if (Straight >= 5)
+            {
+                goto Straight;
+            }
             Three ++;
             MaxPoints[CARD_TYPES_Three_Of_A_Kind] = (CARD_POINT)index;
             CardType = CARD_TYPES_Three_Of_A_Kind;
@@ -204,6 +261,19 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         CardType = CARD_TYPES_Straight;
     }
     #endif
+    return CardType;
+
+Straight:
+    MaxPoints[CARD_TYPES_Straight] = (CARD_POINT)index;
+    CardType = CARD_TYPES_Straight;
+    if (ColorType == CARD_TYPES_Flush)
+    {
+        CardType = CARD_TYPES_Straight_Flush;
+        if (MaxPoints[CARD_TYPES_Royal_Flush] == CARD_POINTT_A)
+        {
+            CardType = CARD_TYPES_Royal_Flush;
+        }
+    }
 
     return CardType;
 

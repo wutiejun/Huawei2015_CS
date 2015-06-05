@@ -132,6 +132,7 @@ typedef enum CARD_POINTT_
     CARD_POINTT_Q,
     CARD_POINTT_K,
     CARD_POINTT_A,
+    CARD_POINTT_BUTT,
 } CARD_POINT;
 
 /* play card */
