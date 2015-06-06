@@ -4,6 +4,13 @@
 
 #define GAME_OVER 0xffee
 
+#define TRACE(format, args...) \
+    do \
+    {\
+        printf("%s:%d:", __FILE__, __LINE__);\
+        printf(format, ## args);\
+    }while(0)
+
 void SetPlayerId(int id);
 
 #define WSADESCRIPTION_LEN 128

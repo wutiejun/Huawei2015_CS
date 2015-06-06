@@ -10,31 +10,75 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdarg.h>
 
 #include <errno.h>
 #include "Player.h"
 
-int log_file = -1;
+//int gettimeofday(struct timeval *tv, struct timezone *tz);
+
 int m_socket_id = -1;
 int total_round = 0;
 int total_msg = 0;
 RoundInfo LocalRoundInfo = {0};
 
-void WriteLog(const char * Msg, int size)
+int log_file = -1;
+pthread_mutex_t LogLock = PTHREAD_MUTEX_INITIALIZER;
+int msg_num = 0;
+#if 0
+typedef struct LOG_DATA_
 {
-    static int msg_num = 0;
-    int buf_len = 0;
-    char Buffer[32] = {0};
-    msg_num ++;
+    int log_file;
+    pthread_mutex_t Lock;
+} LOG_DATA;
+
+LOG_DATA g_Log;
+
+void LogInit(void)
+{
+
+}
+
+void LogExit(void)
+{
+    if ()
+    {
+
+    }
+}
+#endif
+
+static void DebugWriteLog(const char * Msg, int size)
+{
     if (log_file == -1)
     {
         log_file = open("./msg_log.log", O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
     }
-    buf_len = sprintf(Buffer, "====%d====\r\n", msg_num);
-    //printf(Buffer);
-    write(log_file, Buffer, buf_len);
     //printf(Msg);
     write(log_file, Msg, size);
+    syncfs(log_file);
+    return;
+}
+
+void TRACE_Log(const char *file, int len, const char *fmt, ...)
+{
+    int n;
+    int size = 1024;     /* Guess we need no more than 100 bytes. */
+    char p[1024] = {0};
+    struct timeval time;
+    va_list ap;
+
+    pthread_mutex_lock(&LogLock);
+    gettimeofday(&time, NULL);
+
+    n = snprintf(p, size, "[%d.%06d][%s:%d]",
+                 (int)time.tv_sec, (int)time.tv_usec, file, len);
+
+    va_start(ap, fmt);
+    n += vsnprintf(p + n, size, fmt, ap);
+    va_end(ap);
+    DebugWriteLog(p, n);
+    pthread_mutex_unlock(&LogLock);
     return;
 }
 
@@ -132,15 +176,6 @@ bool server_msg_process(int size, const char* msg)
         return false;
     }
 
-    SER_MSG_TYPES Type = Msg_GetMsgType(msg, size);
-    if (Type == SER_MSG_TYPE_seat_info)
-    {
-        total_round ++;
-        printf("Start new round %d/%d!\r\n", total_round, total_msg);
-        //Msg_SaveRoundMsg(&LocalRoundInfo);
-        memset(&LocalRoundInfo, 0, sizeof(RoundInfo));
-    }
-
     //SER_MSG_TYPES msg_type = Msg_Read(msg, size, NULL, &LocalRoundInfo);
 
     Msg_Read_Ex(msg, size, &LocalRoundInfo);
@@ -212,41 +247,6 @@ void * MsgProcessThread(void *pArgs)
     free(strings);
     exit(0);
     return;
-}
-
-char TempBuffer[4096] = {0};
-char TempBuffer2[4096] = {0};
-int lastsize = 0;
-
-/* 读取socket消息，解决消息包粘连问题 */
-int ReceiveMsg(char buffer[1024])
-{
-    int RecSize = 0;
-    int HasMsg = 0;
-    int MsgEndIndex = 0;
-    SER_MSG_TYPES msg_type = SER_MSG_TYPE_none;
-    do
-    {
-        TRACE("Start rce msg:\r\n");
-        RecSize = recv(m_socket_id, TempBuffer + lastsize, sizeof(TempBuffer) - 1 - lastsize, 0);
-        msg_type = Msg_GetMsgType(TempBuffer, RecSize);
-        MsgEndIndex = Msg_CheckMsgByType(TempBuffer, RecSize, msg_type);
-        if (MsgEndIndex > 0)
-        {
-            HasMsg = 1;
-            memcpy(buffer, TempBuffer, MsgEndIndex);
-        }
-        lastsize = RecSize - MsgEndIndex;
-        if (lastsize > 0)
-        {
-            memset(TempBuffer2,0,sizeof(TempBuffer2));
-            memcpy(TempBuffer2, TempBuffer + MsgEndIndex, lastsize);
-            memset(TempBuffer,0,sizeof(TempBuffer));
-            memcpy(TempBuffer, TempBuffer2, lastsize);
-        }
-    } while (HasMsg);
-    printf("ReceiveMsg %d %d:\r\n[%s]", RecSize, MsgEndIndex, buffer);
-    return MsgEndIndex;
 }
 
 int main(int argc, char* argv[])
@@ -330,13 +330,12 @@ int main(int argc, char* argv[])
     /* 开始游戏 */
     while(g_msg_queue.exit == false)
     {
-        char buffer[1024] = {'\0'};
+        char buffer[1024] = {0};
         int size = recv(m_socket_id, buffer, sizeof(buffer) - 1, 0);
-        //TRACE("%d\r\n", size);
         //int size = ReceiveMsg(buffer);
         if (size > 0)
         {
-            WriteLog(buffer, size);
+            TRACE("[%s] %d\r\n", buffer, size);
             MsgQueueAdd(buffer, size);
             total_msg ++;
         }

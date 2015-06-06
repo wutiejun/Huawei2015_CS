@@ -4,14 +4,24 @@
 #include <sys/socket.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
+#if 0
 #define TRACE(format, args...) \
     do \
-    {\
+    {   \
+        struct timeval time;                \
+        gettimeofday(&time, NULL);          \
+        printf("[%6d.%0d]", (int)time.tv_sec, (int)time.tv_usec);    \
         printf("%s:%d:", __FILE__, __LINE__);\
         printf(format, ## args);\
     }while(0)
+#endif
 
+void TRACE_Log(const char *file, int len, const char *fmt, ...);
+
+#define TRACE(format, args...) \
+        TRACE_Log(__FILE__, __LINE__, format, ## args);
 /*****************************************************************************************
 游戏流程:
 1.	player向server注册自己的id和name（reg-msg）
@@ -286,7 +296,7 @@ typedef void (* MSG_LineReader)(char Buffer[256], RoundInfo * pArg);
 typedef struct MSG_NAME_TYPE_ENTRY_
 {
     const char * pStartName;
-    const char * pEndtName;
+    const char * pEndName;
     int NameLen;
     SER_MSG_TYPES MsgType;
     MSG_LineReader LinerReader;
@@ -298,8 +308,6 @@ SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
 SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound);
 
 void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound);
-
-int Msg_CheckMsgByType(const char * pMsg, int MaxLen, SER_MSG_TYPES type);
 
 const char * Msg_GetMsgNameByType(SER_MSG_TYPES Type);
 

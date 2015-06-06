@@ -10,7 +10,7 @@
 #include "Global.h"
 
 typedef int (*fun_ptr)(std::string msg);
- 
+
 const unsigned long MAX_LONG_MESSAGE_LEN = 1024;
 
 static int my_player_id;
@@ -70,7 +70,7 @@ int PlayerMsgProc(char* recv_buf)
     }
 
     //printf("\n revMsg: %s \n",revMsg.c_str());
-    
+
     while (true)
     {
         std::string::size_type nameIndex = revMsg.find_first_of('/',begin);
@@ -86,10 +86,10 @@ int PlayerMsgProc(char* recv_buf)
 
             return 0;
         }
-        
+
         std::string msgName = revMsg.substr(begin,nameIndex-begin);//需要去掉多余的空格
 
-        
+
         msgName = trim(msgName);
 
         if (msgName.empty())
@@ -112,14 +112,13 @@ int PlayerMsgProc(char* recv_buf)
         std::string oneMsg = revMsg.substr(begin,end-begin);
         begin = end;
 
-        /*
         printf("%s \n",msgName.c_str());
         printf("\n oneMsg:%s,name:%s \n",oneMsg.c_str(),msgName.c_str());
-        */
+
         if (msgProcFunMap.count(msgName) > 0)
         {
             msgProcFunMap[msgName](oneMsg.c_str());
-        }             
+        }
     }
 
     return 0;
@@ -127,11 +126,12 @@ int PlayerMsgProc(char* recv_buf)
 
 int RoundEntry(int& socket)
 {
+    int Rec = 0;
     my_sock_client = socket;
 
     char recv_buf[MAX_LONG_MESSAGE_LEN] = {'\0'};
-    
-    recv(socket,recv_buf,MAX_LONG_MESSAGE_LEN,0);
+
+    Rec = recv(socket,recv_buf,MAX_LONG_MESSAGE_LEN,0);
 
     return PlayerMsgProc(recv_buf);
 }
