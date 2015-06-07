@@ -163,16 +163,12 @@ msg_queue_entry * MsgQueueGet(void)
     return pMsg;
 }
 
-void Debug_PrintRoundInfo(RoundInfo * pRound)
-{
-
-}
-
 bool server_msg_process(int size, const char* msg)
 {
     if (NULL != strstr(msg, "game-over"))
     {
-        printf("Game over!\r\n");
+        g_msg_queue.exit = true;
+        printf("My game over!\r\n");
         return false;
     }
 
@@ -181,12 +177,6 @@ bool server_msg_process(int size, const char* msg)
     Msg_Read_Ex(msg, size, &LocalRoundInfo);
 
     //printf("Msg_Read:%d:%s\r\n", msg_type, Msg_GetMsgNameByType(msg_type));
-
-    if (LocalRoundInfo.RoundStatus == SER_MSG_TYPE_inquire)
-    {
-        const char* response = "check";
-        send(m_socket_id, response, sizeof("check"), 0);
-    }
 
     return true;
 }
@@ -249,6 +239,16 @@ void * MsgProcessThread(void *pArgs)
     return;
 }
 
+void StartGame(void)
+{
+    STG_Init();
+}
+
+void ExitGame(void)
+{
+    STG_Dispose();
+}
+
 int main(int argc, char* argv[])
 {
     int ret = 0;
@@ -300,12 +300,12 @@ int main(int argc, char* argv[])
     server_addr.sin_addr.s_addr = server_ip;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(server_port);
-    printf("try to connect server(%s:%u)\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+    printf("my game try to connect server(%s:%u)\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
     while(0 != connect(m_socket_id, (sockaddr*)&server_addr, sizeof(sockaddr)))
     {
         usleep(100*1000);
     };
-    printf("game connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+    printf("my game connect server success\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
 
     /* 向server注册 */
     char reg_msg[50]="";
@@ -327,6 +327,8 @@ int main(int argc, char* argv[])
 
     //TRACE("%d\r\n", g_msg_queue.exit);
 
+    StartGame();
+
     /* 开始游戏 */
     while(g_msg_queue.exit == false)
     {
@@ -341,7 +343,9 @@ int main(int argc, char* argv[])
         }
     }
 
+    pthread_cancel(subThread);
 	close(m_socket_id);
+	ExitGame();
 
     return 0;
 }

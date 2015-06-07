@@ -25,4 +25,4 @@ LD_LIBRARY_PATH=/home/wutiejun/mytools/lib64/ ./gameserver -gip 127.0.0.1 -seq r
 
 ./check 127.0.0.1 6000 127.0.0.3 6003 1003 &
 
-./smart 127.0.0.1 6000 127.0.0.4 6004 1004 &
+./check 127.0.0.1 6000 127.0.0.4 6004 1004 &

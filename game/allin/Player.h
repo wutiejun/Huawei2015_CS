@@ -16,12 +16,15 @@
         printf("%s:%d:", __FILE__, __LINE__);\
         printf(format, ## args);\
     }while(0)
-#endif
+
+#else
 
 void TRACE_Log(const char *file, int len, const char *fmt, ...);
 
 #define TRACE(format, args...) \
         TRACE_Log(__FILE__, __LINE__, format, ## args);
+
+#endif
 /*****************************************************************************************
 游戏流程:
 1.	player向server注册自己的id和name（reg-msg）
@@ -123,6 +126,7 @@ typedef enum CARD_COLOR_
     CARD_COLOR_HEARTS,
     CARD_COLOR_CLUBS,
     CARD_COLOR_DIAMONDS,
+    CARD_COLOR_BUTT,
 } CARD_COLOR;
 
 /* 卡片大小 */
@@ -241,7 +245,7 @@ typedef struct MSG_BLIND_INFO_
 
 typedef struct MSG_SHOWDWON_PLAYER_CARD_
 {
-    int Index;  /* 选手名次 */
+    int Index;          /* 选手名次 */
     char PlayerID[32];
     CARD HoldCards[2];
     char CardType[32];
@@ -278,7 +282,7 @@ typedef struct MSG_INQUIRE_INFO_
 typedef struct RoundInfo_
 {
     int RoundStatus;    /* 当前局状态 */
-    int ReadType;
+    int RoundIndex;
     int InquireCount;
     MSG_SEAT_INFO SeatInfo;
     MSG_CARD_INFO PublicCards;
@@ -312,6 +316,31 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound);
 const char * Msg_GetMsgNameByType(SER_MSG_TYPES Type);
 
 CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD_TYPES_Butt]);
+
+const char *Msg_GetCardTypeName(CARD_TYPES Type);
+
+const char * GetCardPointName(CARD_POINT point);
+
+void Debug_ShowRoundInfo(RoundInfo *pRound);
+
+const char * GetCardColorName(CARD * pCard);
+
+const char * GetCardPointName(CARD_POINT point);
+
+void Debug_PrintChardInfo(CARD * pCard, int CardNum);
+
+void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown);
+
+/****************************************************************************************/
+
+/* 每一局开始前，保存数据 */
+void STG_SaveRoundData(RoundInfo * pRoundInfo);
+
+void STG_SaveStudyData(void);
+
+void STG_Init(void);
+
+void STG_Dispose(void);
 
 /****************************************************************************************/
 

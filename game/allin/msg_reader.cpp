@@ -297,6 +297,7 @@ const char * GetCardPointName(CARD_POINT point)
          case CARD_POINTT_Q: return "Q" ;
          case CARD_POINTT_K: return "K" ;
          case CARD_POINTT_A: return "A" ;
+         default:return "err";
     }
 }
 
@@ -390,23 +391,6 @@ void Msg_ReadPlayJettonInfo(MSG_POT_WIN_INFO * pPotWinInfo, char LineBuffer[256]
     return;
 }
 
-int Msg_ReadPotWinInfo(MSG_READ_INFO *pMsgInfo, MSG_POT_WIN_INFO * pPotWinInfo)
-{
-    char LineBuffer[256] = {0};
-    int ReadNum = 0;
-
-    /* 先读取消息类型，第一行 */
-    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
-    Msg_SetOffset(pMsgInfo, pMsgInfo->Index + ReadNum);
-    memset(LineBuffer, 0, sizeof(LineBuffer));
-    ReadNum = Msg_ReadLine(pMsgInfo, LineBuffer);
-
-    Msg_ReadPlayJettonInfo(pPotWinInfo, LineBuffer);
-
-    //printf("%s[%d]\r\n", LineBuffer, pPotWinInfo->Jetton);
-    return 0;
-}
-
 void Msg_ReadBlindInfo_Ex(char LineBuffer[256], MSG_BLIND_INFO * pBlindInfo)
 {
     Msg_ReadPlayJettonInfo(&pBlindInfo->BlindPlayers[pBlindInfo->BlindNum], LineBuffer);
@@ -418,7 +402,7 @@ const char * GetCardColorName(CARD * pCard)
 {
     switch (pCard->Color)
     {
-        default:
+        default: return "err";
         case CARD_COLOR_CLUBS:      return "CLUBS";
         case CARD_COLOR_DIAMONDS:   return "DIAMONDS";
         case CARD_COLOR_HEARTS:     return "HEARTS";
@@ -526,14 +510,6 @@ const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
 
 void Msg_LinerReader_Seat(char Buffer[256], RoundInfo * pRound)
 {
-    static int RoundIndex = 0;
-
-    if (strstr(Buffer, "button:") != NULL)
-    {
-        RoundIndex ++;
-        TRACE("=============Round %d =========\r\n", RoundIndex);
-        memset(pRound, 0, sizeof(RoundInfo));
-    }
     Msg_ReadSeatInfo_PlayerSeat(&pRound->SeatInfo, Buffer);
     return;
 }
@@ -558,9 +534,16 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
         sscanf(Buffer, "total pot:%d", &Jetton);
         pRound->Inquires[pRound->InquireCount].TotalPot = Jetton;
         pRound->InquireCount ++;
+        {
+            extern int m_socket_id;
+            //TRACE("Response check.\r\n");
+            const char* response = "check";
+            send(m_socket_id, response, sizeof("check"), 0);
+        }
         return;
     }
     Msg_ReadInquireInfoEx(Buffer, &pRound->Inquires[pRound->InquireCount]);
+    return;
 }
 
 void Msg_LinerReader_Flop(char Buffer[256], RoundInfo * pRound)
@@ -677,7 +660,20 @@ void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pRound)
 
 void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pRound)
 {
+    static int RoundIndex = 0;
+
     /* 读取彩池信息 */
+    Msg_ReadPlayJettonInfo(&pRound->PotWin, Buffer);
+    //
+    TRACE("====save round %d =========\r\n", pRound->RoundIndex);
+//  Debug_ShowRoundInfo(pRound);
+    STG_SaveRoundData(pRound);
+
+    RoundIndex ++;
+    TRACE("=============Round %d =========\r\n", RoundIndex);
+    memset(pRound, 0, sizeof(RoundInfo));
+    pRound->RoundIndex = RoundIndex;
+    //
     return;
 }
 
@@ -701,7 +697,7 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
 //        TRACE("%s [%d]\r\n", Buffer, ReadNum);
         while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
         {
-            TRACE("%s [%d]\r\n", Buffer, ReadNum);
+            //TRACE("%s [%d]\r\n", Buffer, ReadNum);
             if (strcmp(Buffer, pMsgEntry->pEndName) == 0)
             {
                 Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
@@ -776,7 +772,7 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
     {
         CARD * pCard = NULL;
         pCard = &pShowDown->PublicCards[index];
-        printf("%s %s\r\n",
+        TRACE("%s %s\r\n",
                GetCardColorName(pCard),
                GetCardPointName(pCard->Point));
     }
@@ -784,7 +780,7 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
     {
         MSG_SHOWDWON_PLAYER_CARD * pPlayerCard = NULL;
         pPlayerCard = &pShowDown->Players[index];
-        printf("%d %s %s %s %s %s\r\n",
+        TRACE("%d %s %s %s %s %s\r\n",
                pPlayerCard->Index,
                GetCardColorName(&pPlayerCard->HoldCards[0]),
                GetCardPointName(pPlayerCard->HoldCards[0].Point),
@@ -792,6 +788,14 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
                GetCardPointName(pPlayerCard->HoldCards[1].Point),
                pPlayerCard->CardType);
     }
+    return;
+}
+
+void Debug_ShowRoundInfo(RoundInfo *pRound)
+{
+    printf("===============round %d=================\r\n", pRound->RoundIndex);
+    Debug_PrintShowDown(&pRound->ShowDown);
+    printf("===============round %d=================\r\n", pRound->RoundIndex);
     return;
 }
 
