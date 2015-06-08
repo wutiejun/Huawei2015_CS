@@ -332,14 +332,18 @@ int main(int argc, char* argv[])
     /* ¿ªÊ¼ÓÎÏ· */
     while(g_msg_queue.exit == false)
     {
-        char buffer[1024] = {0};
+        char buffer[4096] = {0};
         int size = recv(m_socket_id, buffer, sizeof(buffer) - 1, 0);
         //int size = ReceiveMsg(buffer);
         if (size > 0)
         {
-            TRACE("[%s] %d\r\n", buffer, size);
-            MsgQueueAdd(buffer, size);
-            total_msg ++;
+            //TRACE("[%s] %d\r\n", buffer, size);
+            //MsgQueueAdd(buffer, size);
+            if(server_msg_process(size, buffer) != true)
+            {
+                break;
+            }
+            //total_msg ++;
         }
     }
 

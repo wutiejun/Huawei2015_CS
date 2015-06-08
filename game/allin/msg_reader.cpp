@@ -744,10 +744,10 @@ void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
 void Debug_PrintChardInfo(CARD * pCard, int CardNum)
 {
     int index = 0;
-    printf("Card Info:\r\n");
+    TRACE("Card Info:\r\n");
     for (index = 0; index < CardNum; index ++)
     {
-        printf("card_%d %s %s\n", index, GetCardColorName(pCard),
+        TRACE("card_%d %s %s\n", index, GetCardColorName(pCard),
                GetCardPointName(pCard->Point));
         pCard ++;
     }
@@ -768,6 +768,7 @@ void Debug_PrintBlindInfo(MSG_BLIND_INFO * pBlind)
 void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
 {
     int index = 0;
+    TRACE("Public cards:\r\n");
     for (index = 0; index < pShowDown->CardNum - 1; index ++)
     {
         CARD * pCard = NULL;
@@ -780,7 +781,8 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
     {
         MSG_SHOWDWON_PLAYER_CARD * pPlayerCard = NULL;
         pPlayerCard = &pShowDown->Players[index];
-        TRACE("%d %s %s %s %s %s\r\n",
+        TRACE("Player %s:%d %s %s %s %s %s\r\n",
+               pPlayerCard->PlayerID,
                pPlayerCard->Index,
                GetCardColorName(&pPlayerCard->HoldCards[0]),
                GetCardPointName(pPlayerCard->HoldCards[0].Point),
@@ -793,9 +795,10 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
 
 void Debug_ShowRoundInfo(RoundInfo *pRound)
 {
-    printf("===============round %d=================\r\n", pRound->RoundIndex);
+    printf("===============round %d start=================\r\n", pRound->RoundIndex);
+    TRACE("===============round %d start=================\r\n", pRound->RoundIndex);
     Debug_PrintShowDown(&pRound->ShowDown);
-    printf("===============round %d=================\r\n", pRound->RoundIndex);
+    TRACE("===============round %d end=================\r\n", pRound->RoundIndex);
     return;
 }
 

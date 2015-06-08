@@ -241,12 +241,20 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
             {
                 MaxPoints[CARD_TYPES_TwoPair] = (CARD_POINT)index;
             }
+            if (Three >= 1)
+            {
+                MaxPoints[CARD_TYPES_Full_House] = (CARD_POINT)index;
+            }
         }
         if (AllPoints[index] == 3)
         {
             //TRACE("\r\n");
             Three ++;
             MaxPoints[CARD_TYPES_Three_Of_A_Kind] = (CARD_POINT)index;
+            if (Pairs >= 1)
+            {
+                MaxPoints[CARD_TYPES_Full_House] = (CARD_POINT)index;
+            }
         }
         if (AllPoints[index] == 4)
         {
@@ -320,6 +328,9 @@ void STG_AnalyseWinCard_AllCards(CARD AllCards[7], int WinIndex)
     {
         g_stg.AllWinCards[CardType][MaxPoints[CardType]].WinTimes ++;
     }
+    TRACE("Win Type %s, max point %d, %d;\r\n",
+          Msg_GetCardTypeName(CardType),
+          (int)MaxPoints[CardType], WinIndex);
 }
 
 /* 分析各选手的牌与公牌的组合，然后记录赢牌和出现牌的次数 */
@@ -329,15 +340,16 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
     int index = 0;
     MSG_SHOWDWON_PLAYER_CARD * pPlayCard = NULL;
 
-    /* 先复制前面5张公牌 */
-    memcpy(&AllCards, &pRound->ShowDown.PublicCards, sizeof(pRound->ShowDown.PublicCards));
-    for (index = 0; index < pRound->ShowDown.PlayerNum; index ++)
+    for (index = 0; index < pRound->ShowDown.PlayerNum - 1; index ++)
     {
+        /* 牌型算法要对AllCards排序，需要每次都重新赋值 */
+        memcpy(&AllCards, &pRound->ShowDown.PublicCards, sizeof(pRound->ShowDown.PublicCards));
         pPlayCard = &pRound->ShowDown.Players[index];
         AllCards[5] = pPlayCard->HoldCards[0];
         AllCards[6] = pPlayCard->HoldCards[1];
-        TRACE("Debug_PrintShowDown:%d\r\n", pRound->RoundIndex);
-        Debug_PrintShowDown(&pRound->ShowDown);
+        TRACE("Debug_PrintShowDown:%d player %d;\r\n", pRound->RoundIndex, index);
+        //Debug_PrintShowDown(&pRound->ShowDown);
+        Debug_PrintChardInfo(AllCards, 7);
         //
         STG_AnalyseWinCard_AllCards(AllCards, pRound->ShowDown.Players[index].Index);
     }
@@ -361,6 +373,8 @@ void * STG_ProcessThread(void *pArgs)
             usleep(1000);
             continue;
         }
+
+        Debug_ShowRoundInfo(pRound);
 
         //printf("Get round %d data to anylize.\r\n", pRound->RoundIndex);
 
