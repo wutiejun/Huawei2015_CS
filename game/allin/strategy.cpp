@@ -93,7 +93,7 @@ void STG_LoadStudyData(void)
     }
     close(fid);
 
-    STG_Debug_PrintWinCardData();
+    //STG_Debug_PrintWinCardData();
 
     return;
 }
@@ -108,7 +108,7 @@ void STG_SaveStudyData(void)
     }
     write(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
     close(fid);
-    STG_Debug_PrintWinCardData();
+    //STG_Debug_PrintWinCardData();
     TRACE("Save game_win_data.bin\r\n");
     return;
 }
@@ -214,18 +214,18 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
     }
 
-    //TRACE("\r\n");
-
+    //TRACE("STG_GetCardTypes:\r\n");
     for (index = CARD_POINTT_2; index < CARD_POINTT_A + 1; index ++)
     {
         if (AllPoints[index] == 0)
         {
             //TRACE("\r\n");
-            Straight = 0;   /* 顺子只要中间有一个断开，就不是了 */
+            /* 顺子只要中间有一个断开，就不是了，但如果已经大于5了，就不变 */
+            Straight = Straight >=5 ? Straight : 0;
         }
         if (AllPoints[index] >= 1)
         {
-            //TRACE("\r\n");
+            //TRACE("[%d]%d ", index, AllPoints[index]);
             Straight ++;
             if (Straight >= 5)
             {
@@ -234,7 +234,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
         if (AllPoints[index] == 2)
         {
-            //TRACE("\r\n");
             Pairs ++;
             MaxPoints[CARD_TYPES_OnePair] = (CARD_POINT)index;
             if (Pairs >= 2)
@@ -248,7 +247,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
         if (AllPoints[index] == 3)
         {
-            //TRACE("\r\n");
             Three ++;
             MaxPoints[CARD_TYPES_Three_Of_A_Kind] = (CARD_POINT)index;
             if (Pairs >= 1)
@@ -258,13 +256,10 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
         if (AllPoints[index] == 4)
         {
-            //TRACE("\r\n");
             Four ++;
             MaxPoints[CARD_TYPES_Four_Of_A_Kind] = (CARD_POINT)index;
         }
     }
-
-    //TRACE("\r\n");
 
     /* 赢牌类型从大到小判断 */
 
@@ -278,6 +273,9 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
                 return SpicalType;
         }
     }
+
+    TRACE("\r\nSTG_GetCardTypes_end. four:%d;three:%d;pair:%d;straight:%d;color:%d;\r\n",
+           Four, Three, Pairs, Straight, (int)ColorType);
 
     if (Four > 0)
     {

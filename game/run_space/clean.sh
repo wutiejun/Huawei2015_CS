@@ -4,5 +4,5 @@ killall check
 killall gameserver
 rm -f log.txt
 rm -f replay.txt
-rm -f data.scv
+rm -f data.csv
 

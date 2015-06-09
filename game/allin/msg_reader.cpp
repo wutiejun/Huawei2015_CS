@@ -562,17 +562,18 @@ const char *Msg_GetCardTypeName(CARD_TYPES Type)
 {
     const char * TypeNames[] =
     {
-        "CARD_TYPES_None",
-        "CARD_TYPES_High",
-        "CARD_TYPES_OnePair",
-        "CARD_TYPES_TwoPair",
-        "CARD_TYPES_Three_Of_A_Kind",
-        "CARD_TYPES_Straight",
-        "CARD_TYPES_Flush",
-        "CARD_TYPES_Full_House",
-        "CARD_TYPES_Four_Of_A_Kind",
-        "CARD_TYPES_Straight_Flush",
-        "CARD_TYPES_Royal_Flush",
+        /* CT for CardType */
+        "CT_None",
+        "CT_HIGH_CARD",
+        "CT_ONE_PAIR",
+        "CT_TWO_PAIR",
+        "CT_THREE_OF_A_KIND",
+        "CT_STRAIGHT",
+        "CT_FLUSH",
+        "CT_FULL_HOUSE",
+        "CT_FOUR_OF_A_KIND",
+        "CT_STRAIGHT_FLUSH",
+        "CT_ROYAL_FLUSH",
     };
     return TypeNames[Type];
 }
