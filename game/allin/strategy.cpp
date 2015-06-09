@@ -219,7 +219,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     {
         if (AllPoints[index] == 0)
         {
-            //TRACE("\r\n");
             /* 顺子只要中间有一个断开，就不是了，但如果已经大于5了，就不变 */
             Straight = Straight >=5 ? Straight : 0;
         }
@@ -230,6 +229,14 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
             if (Straight >= 5)
             {
                 MaxPoints[CARD_TYPES_Straight] = (CARD_POINT)index;
+            }
+            if ((index == CARD_POINTT_5) && (Straight == 4) && (AllPoints[CARD_POINTT_A] > 0))
+            {
+                /* A,2,3,4,5的顺子 */
+                static int spical_straight = 0;
+                Straight ++;
+                MaxPoints[CARD_TYPES_Straight] = (CARD_POINT)index;
+                //printf("spical_straight:%d\r\n", spical_straight++);
             }
         }
         if (AllPoints[index] == 2)
