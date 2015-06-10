@@ -10,8 +10,6 @@
 
 /* 负责消息读取与解析 */
 
-RoundInfo roundInfo = {0};
-
 void Debug_PrintChardInfo(CARD * pCard, int CardNum);
 void Msg_LinerReader_Seat(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_Blind(char Buffer[256], RoundInfo * pArg);
@@ -804,10 +802,32 @@ void Debug_ShowRoundInfo(RoundInfo *pRound)
 }
 
 #ifdef DEBUG
-int main(int argc, char * argv[])
-#else
-int main_ex(int argc, char * argv[])
-#endif
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+
+RoundInfo roundInfo = {0};
+
+int ReadDebugMsgFromFile(const char * File, void *pBuffer, int Max)
+{
+    int Fid = -1;
+    int RedSize = 0;
+    Fid = open(File, O_RDONLY);
+    if (Fid == -1)
+    {
+        printf("open error %d.\r\n", errno);
+        return 0;
+    }
+    RedSize = read(Fid, pBuffer, Max);
+    close(Fid);
+    printf("read file %s size %d %s;\r\n", File, RedSize, strerror(errno));
+    return RedSize;
+}
+
+void Test_001(void)
 {
     int count = sizeof(TestMessages)/sizeof(const char  *);
     SER_MSG_TYPES type = SER_MSG_TYPE_none;
@@ -833,7 +853,45 @@ int main_ex(int argc, char * argv[])
     printf("========show down============\r\n");
     Msg_Read_Ex(TestMessages[7], strlen(TestMessages[7]), &roundInfo);
     Debug_PrintShowDown(&roundInfo.ShowDown);
-    return 0;
+    return ;
 }
+
+int m_socket_id=0;
+
+void STG_AnalyseWinCard(RoundInfo *pRound);
+
+int main(int argc, char * argv[])
+{
+    CARD AllCard[7];// = {0};
+    char Buffer[4096] = {0};
+    int readSize = 0;
+    if (argc < 1)
+    {
+        printf("args error.\r\n");
+        return 0;
+    }
+    readSize = ReadDebugMsgFromFile(argv[1], Buffer, 4096);
+    if (readSize <= 0)
+    {
+        printf("ReadDebugMsgFromFile error.\r\n");
+        return 0;
+    }
+
+    memset(AllCard, 0, sizeof(AllCard));
+
+    Msg_Read_Ex(Buffer, readSize, &roundInfo);
+    printf("%s\r\n", Buffer);
+
+    Debug_PrintShowDown(&roundInfo.ShowDown);
+
+    printf("\r\n");
+
+    STG_AnalyseWinCard(&roundInfo);
+
+    return 0;
+
+}
+
+#endif
 
 
