@@ -174,11 +174,74 @@ bool STG_IsTwoHoldCardHasSamePoint(CARD CardsA[2], CARD CardsB[2])
     return false;
 }
 
+static void print_card(CARD * pCard, int CardNum)
+{
+    int index = 0;
+    printf("Card Info:\r\n");
+    for (index = 0; index < CardNum; index ++)
+    {
+        printf("card_%d %s %s\n", index, GetCardColorName(pCard),
+               GetCardPointName(pCard->Point));
+        pCard ++;
+    }
+    return;
+}
+
+/* 判断是否是同花顺，以及皇家同花顺, pCards已经是 */
+CARD_TYPES SET_GetStraightType(CARD FlushCards[8], int CardNum, CARD_POINT * pMaxPoint)
+{
+    int index = 0;
+    int StriaghtNum = 1;
+    int MaxIndex = 0;
+    CARD_POINT PrePoint = CARD_POINTT_Unknow;
+    //printf("Get %d card for flush:\r\n", CardNum);
+    //print_card(FlushCards, CardNum);
+    for (index = 0; index < CardNum; index ++)
+    {
+        if (FlushCards[index].Point == CARD_POINTT_Unknow)
+        {
+            /* 跳过没有填写的花色牌，这张可能是其它花色的，不在这里 */
+            continue;
+        }
+        if (PrePoint == CARD_POINTT_Unknow)
+        {
+            PrePoint =  FlushCards[index].Point;
+            continue;
+        }
+        //printf("%d %d %d %d\r\n", index, (int)PrePoint, StriaghtNum,(int)FlushCards[index].Point);
+        if (FlushCards[index].Point == PrePoint + 1)
+        {
+            MaxIndex = index;
+            StriaghtNum ++;
+        }
+        else
+        {
+            StriaghtNum = 1;
+        }
+        PrePoint = FlushCards[index].Point;
+    }
+
+    //printf("result %d %d;\r\n", StriaghtNum, MaxIndex);
+
+    if ((StriaghtNum >= 5) && (FlushCards[MaxIndex].Point == CARD_POINTT_A))
+    {
+        *pMaxPoint = FlushCards[MaxIndex].Point;
+        return CARD_TYPES_Royal_Flush;
+    }
+    if (StriaghtNum >= 5)
+    {
+        *pMaxPoint = FlushCards[MaxIndex].Point;
+        return CARD_TYPES_Straight_Flush;
+    }
+    return CARD_TYPES_None;
+}
+
 /* 根据不同的牌数，计算牌的类型 */
 CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD_TYPES_Butt])
 {
     int AllPoints[CARD_POINTT_BUTT];// = {0};
     int AllColors[CARD_COLOR_BUTT];// = {0};
+    CARD FlushCards[CARD_COLOR_BUTT][8];    /* 不超过7张牌 */
     int index = 0;
     int Pairs = 0;
     int Three = 0;
@@ -186,9 +249,11 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     int Straight = 0;
     CARD_TYPES CardType = CARD_TYPES_High;
     CARD_TYPES ColorType = CARD_TYPES_None;
+    CARD_COLOR FlushColor = CARD_COLOR_Unknow;
 
     memset(&AllPoints, 0, sizeof(AllPoints));
     memset(&AllColors, 0, sizeof(AllColors));
+    memset(FlushCards, 0, sizeof(FlushCards));
 
     STG_SortCardByPoint(pCards, CardNum);
 
@@ -203,16 +268,20 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         //       GetCardPointName(pCards[index].Point));
         AllColors[pCards[index].Color] ++;
         AllPoints[pCards[index].Point] ++;
-        //TRACE("%d;\r\n", AllColors[pCards[index].Color]);
+
+        /* 将牌放到同一花色数组中 */
+        FlushCards[pCards[index].Color][index] = pCards[index];
+        //
         if (AllColors[pCards[index].Color] >= 5)
         {
             /* 记录同花，同花顺，皇家同花顺的最大点数 */
             MaxPoints[CARD_TYPES_Flush] = pCards[index].Point;
-//            MaxPoints[CARD_TYPES_Straight_Flush] = pCards[index].Point;
-//            MaxPoints[CARD_TYPES_Royal_Flush] = pCards[index].Point;
+            FlushColor = pCards[index].Color;
             ColorType = CARD_TYPES_Flush;
         }
     }
+
+
 
     //TRACE("STG_GetCardTypes:\r\n");
     for (index = CARD_POINTT_2; index < CARD_POINTT_A + 1; index ++)
@@ -273,11 +342,14 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     /* 同花顺和皇家同花顺，暂时不判断，概率为0 */
     if ((Straight >= 5) && (ColorType == CARD_TYPES_Flush))
     {
-        CARD_TYPES SpicalType = CARD_TYPES_Flush;
-        if (   (SpicalType == CARD_TYPES_Straight_Flush)
-            || (SpicalType == CARD_TYPES_Royal_Flush))
+        CARD_POINT SpicalMaxPoint;
+        CARD_TYPES SpicalType = SET_GetStraightType(FlushCards[FlushColor],
+                                                    7,
+                                                    &SpicalMaxPoint);
+        if (SpicalType != CARD_TYPES_None)
         {
-                return SpicalType;
+            MaxPoints[SpicalType] = SpicalMaxPoint;
+            return SpicalType;
         }
     }
 
@@ -289,7 +361,7 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         return CARD_TYPES_Four_Of_A_Kind;
     }
 
-    if ((Three > 0) && (Pairs > 0))
+    if (((Three > 0) && (Pairs > 0)) || (Three >= 2))
     {
         return CARD_TYPES_Full_House;
     }

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#if 0
+#ifdef DEBUG
 #define TRACE(format, args...) \
     do \
     {   \
