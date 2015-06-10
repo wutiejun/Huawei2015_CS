@@ -281,7 +281,8 @@ typedef struct MSG_INQUIRE_INFO_
 /* 每一局信息 */
 typedef struct RoundInfo_
 {
-    int RoundStatus;    /* 当前局状态 */
+    SER_MSG_TYPES CurrentMsgType;
+    SER_MSG_TYPES RoundStatus;                /* 当前局状态 */
     int RoundIndex;
     int InquireCount;
     MSG_SEAT_INFO SeatInfo;
@@ -341,6 +342,12 @@ void STG_SaveStudyData(void);
 void STG_Init(void);
 
 void STG_Dispose(void);
+
+int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint);
+
+const char * STG_GetAction(RoundInfo * pRound);
+
+const char * GetActionName(PLAYER_Action act);
 
 /****************************************************************************************/
 

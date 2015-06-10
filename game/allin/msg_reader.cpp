@@ -460,9 +460,19 @@ PLAYER_Action GetAction(const char * ActionNAme)
     return ACTION_fold;
 }
 
+/*
+typedef enum PLAYER_Action_
+{
+    ACTION_check,
+    ACTION_call,
+    ACTION_allin,
+    ACTION_raise,
+    ACTION_fold,
+} PLAYER_Action;
+*/
 const char * GetActionName(PLAYER_Action act)
 {
-    const char * Actions[] = {"check", "all", "allin", "rais", "fold"};
+    const char * Actions[] = {"check", "call", "all_in", "rais", "fold"};
     return Actions[act];
 }
 
@@ -509,18 +519,21 @@ const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo)
 void Msg_LinerReader_Seat(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadSeatInfo_PlayerSeat(&pRound->SeatInfo, Buffer);
+    pRound->RoundStatus = SER_MSG_TYPE_seat_info;
     return;
 }
 
 void Msg_LinerReader_Blind(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadBlindInfo_Ex(Buffer, &pRound->Blind);
+    pRound->RoundStatus = SER_MSG_TYPE_blind;
     return;
 }
 
 void Msg_LinerReader_Hold(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->HoldCards, Buffer);
+    pRound->RoundStatus = SER_MSG_TYPE_hold_cards;
     return;
 }
 
@@ -535,8 +548,9 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
         {
             extern int m_socket_id;
             //TRACE("Response check.\r\n");
-            const char* response = "check";
-            send(m_socket_id, response, sizeof("check"), 0);
+            //const char* response = "check";
+            const char* response = STG_GetAction(pRound);
+            send(m_socket_id, response, strlen(response) + 1, 0);
         }
         return;
     }
@@ -547,12 +561,14 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
 void Msg_LinerReader_Flop(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
+    pRound->RoundStatus = SER_MSG_TYPE_flop;
     return;
 }
 
 void Msg_LinerReader_Turn(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
+    pRound->RoundStatus = SER_MSG_TYPE_turn;
     return;
 }
 
@@ -578,11 +594,13 @@ const char *Msg_GetCardTypeName(CARD_TYPES Type)
 
 void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 {
-    CARD AllCards[7];
-    CARD_POINT MaxPoint[CARD_TYPES_Butt];
-    CARD_TYPES Type = CARD_TYPES_None;
+    //CARD AllCards[7];
+    //CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    //CARD_TYPES Type = CARD_TYPES_None;
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
+    pRound->RoundStatus = SER_MSG_TYPE_river;
 
+#if 0
     AllCards[0] = pRound->PublicCards.Cards[0];
     AllCards[1] = pRound->PublicCards.Cards[1];
     AllCards[2] = pRound->PublicCards.Cards[2];
@@ -590,11 +608,9 @@ void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
     AllCards[4] = pRound->PublicCards.Cards[4];
     AllCards[5] = pRound->HoldCards.Cards[0];
     AllCards[6] = pRound->HoldCards.Cards[1];
+#endif
 
-    //Debug_PrintChardInfo(&pRound->PublicCards);
-    //Debug_PrintChardInfo(&pRound->HoldCards);
-
-    Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
+    //Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
     //Debug_PrintChardInfo(AllCards, 7);
 
     //printf("Type %s, Max:%d\r\n", Msg_GetCardTypeName(Type), MaxPoint[Type]);
@@ -605,6 +621,9 @@ void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
 {
     //TRACE("%s %d %d \r\n", Buffer, pRound->ShowDown.CardNum, pRound->ShowDown.PlayerNum);
+
+    pRound->RoundStatus = SER_MSG_TYPE_showdown;
+
     /* 先读取5张公牌 */
     if ((pRound->ShowDown.CardNum >= 1) && (pRound->ShowDown.CardNum <= 5))
     {
@@ -672,6 +691,7 @@ void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pRound)
     TRACE("=============Round %d =========\r\n", RoundIndex);
     memset(pRound, 0, sizeof(RoundInfo));
     pRound->RoundIndex = RoundIndex;
+
     //
     return;
 }
@@ -691,7 +711,7 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
     {
         Type = Msg_GetMsgTypeByMsgName(Buffer);
         pMsgEntry = &AllMsgTypes[Type];
-        pRound->RoundStatus = Type;
+        pRound->CurrentMsgType = Type;
         Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
 //        TRACE("%s [%d]\r\n", Buffer, ReadNum);
         while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)

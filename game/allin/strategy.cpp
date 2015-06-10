@@ -63,7 +63,7 @@ void STG_Debug_PrintWinCardData(void)
     {
         for (Point = CARD_POINTT_2; Point < CARD_POINTT_BUTT; Point ++)
         {
-            TRACE("Type:%s Max point: %s ShowTimes:%d; WinTimes:%d;\r\n",
+            TRACE("Type:%s Max point: %s ShowTimes:%5d; WinTimes:%5d;\r\n",
                    Msg_GetCardTypeName((CARD_TYPES)Type),
                    GetCardPointName((CARD_POINT)Point),
                    g_stg.AllWinCards[Type][Point].ShowTimes,
@@ -79,9 +79,10 @@ void STG_LoadStudyData(void)
 
     memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
 
-    fid = open("game_win_data.bin", O_WRONLY);
+    fid = open("game_win_data.bin", O_RDONLY);
     if (fid == -1)
     {
+        TRACE("Load game_win_data.bin error.\r\n");
         return;
     }
 
@@ -89,11 +90,11 @@ void STG_LoadStudyData(void)
     if (read_size != sizeof(g_stg.AllWinCards))
     {
         memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
-        TRACE("Load game_win_data.bin\r\n");
+        TRACE("Load game_win_data.bin error.\r\n");
     }
     close(fid);
 
-    //STG_Debug_PrintWinCardData();
+    STG_Debug_PrintWinCardData();
 
     return;
 }
@@ -104,11 +105,12 @@ void STG_SaveStudyData(void)
     fid = open("game_win_data.bin", O_CREAT|O_WRONLY|O_TRUNC|O_SYNC);
     if (fid == -1)
     {
+        TRACE("Save game_win_data.bin error.\r\n");
         return;
     }
     write(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
     close(fid);
-    //STG_Debug_PrintWinCardData();
+    STG_Debug_PrintWinCardData();
     TRACE("Save game_win_data.bin\r\n");
     return;
 }
@@ -125,6 +127,110 @@ void STG_SaveRoundData(RoundInfo * pRoundInfo)
     TRACE("Save round %d data.\r\n", g_stg.StgWriteIndex);
     STG_Unlock();
     return;
+}
+
+int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
+{
+    int WinNum = g_stg.AllWinCards[Type][MaxPoint].WinTimes;
+    int ShowNum = g_stg.AllWinCards[Type][MaxPoint].ShowTimes;
+    #if 0
+    printf("Check Win Ration: %s %s: %d / %d;\r\n",
+          Msg_GetCardTypeName(Type),
+          GetCardPointName(MaxPoint),
+          WinNum, ShowNum);
+    #endif
+    if (ShowNum > 0)
+    {
+        return (WinNum * 100) / ShowNum;
+    }
+    return 0;
+}
+
+/*
+
+*/
+PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
+{
+    int WinRation = 0;
+    CARD AllCards[2];
+    CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    CARD_TYPES Type = CARD_TYPES_None;
+    AllCards[0] = pRound->HoldCards.Cards[0];
+    AllCards[1] = pRound->HoldCards.Cards[1];
+
+    Type = STG_GetCardTypes(AllCards, 2, MaxPoint);
+    WinRation = STG_CheckWinRation(Type, MaxPoint[Type]);
+    if (WinRation > 50)
+    {
+        return ACTION_raise;
+    }
+    return ACTION_check;
+}
+
+bool STG_IsMaxPointInHand(CARD_POINT MaxPoint, CARD Cards[2])
+{
+    if (   (Cards[0].Point == MaxPoint)
+        || (Cards[1].Point == MaxPoint))
+    {
+        return true;
+    }
+    return false;
+}
+
+/*
+    河牌时的处理，关键
+*/
+PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
+{
+    int WinRation = 0;
+    CARD AllCards[7];
+    CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    CARD_TYPES Type = CARD_TYPES_None;
+    bool IsMaxInHand = false;
+    AllCards[0] = pRound->PublicCards.Cards[0];
+    AllCards[1] = pRound->PublicCards.Cards[1];
+    AllCards[2] = pRound->PublicCards.Cards[2];
+    AllCards[3] = pRound->PublicCards.Cards[3];
+    AllCards[4] = pRound->PublicCards.Cards[4];
+    AllCards[5] = pRound->HoldCards.Cards[0];
+    AllCards[6] = pRound->HoldCards.Cards[1];
+    Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
+    WinRation = STG_CheckWinRation(Type, MaxPoint[Type]);
+
+    if ((WinRation >= 50) && STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards))
+    {
+        #if 0
+        printf("Round %d allin:%d; \r\n", pRound->RoundIndex, WinRation,
+               Msg_GetCardTypeName(Type),
+               GetCardPointName(MaxPoint[Type]));
+        #endif
+        return ACTION_allin;
+    }
+    else
+    {
+        return ACTION_check;
+    }
+}
+
+/* 只会在inquire中读取处理动作 */
+const char * STG_GetAction(RoundInfo * pRound)
+{
+    PLAYER_Action  Action = ACTION_fold;
+
+    switch (pRound->RoundStatus)
+    {
+    default:
+         Action = ACTION_check;
+         break;
+    case SER_MSG_TYPE_hold_cards:/* 只有两张手牌时的inqurie */
+        Action = ACTION_check;
+        //Action = STG_GetHoldAction(pRound);
+        break;
+    case SER_MSG_TYPE_river:/* 只有两张手牌时的inqurie */
+        Action = STG_GetRiverAction(pRound);
+        break;
+    }
+    return GetActionName(Action);
 }
 
 RoundInfo * STG_GetNextRound(void)
@@ -424,9 +530,9 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
         pPlayCard = &pRound->ShowDown.Players[index];
         AllCards[5] = pPlayCard->HoldCards[0];
         AllCards[6] = pPlayCard->HoldCards[1];
-        TRACE("Debug_PrintShowDown:%d player %d;\r\n", pRound->RoundIndex, index);
+        //TRACE("Debug_PrintShowDown:%d player %d;\r\n", pRound->RoundIndex, index);
         //Debug_PrintShowDown(&pRound->ShowDown);
-        Debug_PrintChardInfo(AllCards, 7);
+        //Debug_PrintChardInfo(AllCards, 7);
         //
         STG_AnalyseWinCard_AllCards(AllCards, pRound->ShowDown.Players[index].Index);
     }
