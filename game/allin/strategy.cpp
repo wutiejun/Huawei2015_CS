@@ -16,6 +16,39 @@
 
 /* 负责处理策略 */
 
+/***************************************************************
+Card type win info:
+Type              : Total   Win
+===========================================
+ROYAL_FLUSH       :     0     0
+STRAIGHT_FLUSH    :     5     5
+FOUR_OF_A_KIND    :    14    14
+FULL_HOUSE        :   267   203
+FLUSH             :   432   228
+STRAIGHT          :   574   369
+THREE_OF_A_KIND   :   564   274
+TWO_PAIR          :  2822   445
+ONE_PAIR          :  5327   160
+HIGH_CARD         :  2126     0
+===========================================
+All Total         : 12131  1698
+****************************************************************/
+
+/* 各类版型出现的机率，统计3场的概率，先写死在这里 */
+int g_CardTypeRation[CARD_TYPES_Butt] =
+{
+    0,
+    100 * 5 /12131,         // 0
+    100 * 14 /12131,        // 0
+    100 * 267 /12131,       // 2
+    100 * 432 /12131,       // 3
+    100 * 574 /12131,       // 4
+    100 * 564 /12131,       // 4
+    100 * 2822 /12131,      // 23
+    100 * 5327 /12131,      // 43
+    100 * 2126 /12131,      // 17
+};
+
 obj_queue g_round_queue;
 
 void QueueInit(obj_queue * pQueue)
@@ -88,6 +121,19 @@ typedef struct STG_WIN_CARDS_
     //CARD_POINT MaxPoint;    /* 赢牌的最大点数 */
     //CARD_POINT SedPoint;    /* 赢牌的次大点数，这个是否需要考虑？可以不考虑，如果是两对的情况，次大牌可以再通过一对的情况来判断 */
 } STG_WIN_CARDS;
+
+/* 牌型(手牌)发展概率 */
+typedef struct STG_POINT_DEVELOP_
+{
+
+
+} STG_POINT_DEVELOP;
+
+/* 花色发展情况 */
+typedef struct STG_COLOR_DEVELOP_
+{
+
+} STG_COLOR_DEVELOP;
 
 typedef struct STG_DATA_
 {
@@ -211,6 +257,38 @@ int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
     return 0;
 }
 
+/* 仅通过牌型来查询胜率，在不同场景下有比较好的优势，如解决一些机器人 */
+int STG_CheckWinRationByType(CARD_TYPES Type)
+{
+    int index = 0;
+    int WinNum = 0;
+    int ShowNum  = 0;
+
+    /* 读取数据，不用上锁 */
+    for (index = CARD_POINTT_2; index < CARD_POINTT_BUTT; index ++)
+    {
+        WinNum += g_stg.AllWinCards[Type][index].WinTimes;
+        ShowNum += g_stg.AllWinCards[Type][index].ShowTimes;
+    }
+    if (ShowNum > 0)
+    {
+        return (WinNum * 100) / ShowNum;
+    }
+    return 0;
+}
+
+/* 判断两张手牌是否是一对 */
+bool STG_IsHoldPair(RoundInfo * pRound)
+{
+    return pRound->HoldCards.Cards[0].Point == pRound->HoldCards.Cards[1].Point;
+}
+
+/* 判断两张手牌是否是同花色 */
+bool STG_IsHoldSameColor(RoundInfo * pRound)
+{
+    return pRound->HoldCards.Cards[0].Color == pRound->HoldCards.Cards[1].Color;
+}
+
 /* 处理手牌阶段的inquire */
 PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
 {
@@ -275,24 +353,42 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
 }
 
 /* 只会在inquire中读取处理动作 */
-const char * STG_GetAction(RoundInfo * pRound)
+int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
 {
+    const char * pAction = NULL;
     PLAYER_Action  Action = ACTION_fold;
+    Action = ACTION_check;
 
     switch (pRound->RoundStatus)
     {
     default:
-         Action = ACTION_check;
          break;
     case SER_MSG_TYPE_hold_cards:/* 只有两张手牌时的inqurie */
-        Action = ACTION_check;
-        //Action = STG_GetHoldAction(pRound);
+        //Action = ACTION_check;
+        Action = STG_GetHoldAction(pRound);
+        break;
+    case SER_MSG_TYPE_flop:     /* 三张公牌后的inqurie */
+        //Action = ACTION_check;
+        //Action = STG_GetFlopAction(pRound);
+        break;
+    case SER_MSG_TYPE_turn:     /* 四张公牌后的inqurie */
+        //Action = ACTION_check;
+        //Action = STG_GetTurnAction(pRound);
         break;
     case SER_MSG_TYPE_river:/* 只有两张手牌时的inqurie */
         Action = STG_GetRiverAction(pRound);
         break;
     }
-    return GetActionName(Action);
+
+    pAction = GetActionName(Action);
+    if (Action == ACTION_raise)
+    {
+        return sprintf(ActionBuf, "%s %d", pAction, pRound->RaiseJetton);
+    }
+    else
+    {
+        return sprintf(ActionBuf, "%s", pAction);
+    }
 }
 
 /* 处理inquire的回复 */
@@ -300,8 +396,9 @@ void STG_InquireAction(RoundInfo * pRound)
 {
     //TRACE("Response check.\r\n");
     //const char* response = "check";
-    const char* response = STG_GetAction(pRound);
-    ResponseAction(response, strlen(response) + 1);
+    char ActionBufer[128] = {0};
+    int ResNum = STG_GetAction(pRound, ActionBufer);
+    ResponseAction(ActionBufer, ResNum);
     return;
 }
 

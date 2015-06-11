@@ -9,6 +9,8 @@
 #include "pthread.h"
 #include <errno.h>
 
+/* check»úÆ÷ÈË */
+
 int m_socket_id = -1;
 
 bool server_msg_process(int size, const char* msg)

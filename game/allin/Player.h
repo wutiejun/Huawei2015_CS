@@ -306,6 +306,7 @@ typedef struct RoundInfo_
     SER_MSG_TYPES RoundStatus;                /* 当前局状态 */
     int RoundIndex;
     int InquireCount;
+    int RaiseJetton;            /* 策略是要加注时的大小 */
     MSG_SEAT_INFO SeatInfo;
     MSG_CARD_INFO PublicCards;
     MSG_CARD_INFO HoldCards;
