@@ -6,6 +6,27 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+
+typedef struct queue_entry_
+{
+    struct queue_entry_ * pNextMsg;
+    void * pObjData;
+} queue_entry;
+
+typedef struct obj_queue_
+{
+    int MsgCount;
+    pthread_mutex_t Lock;
+    queue_entry * pFirstMsg;
+    queue_entry * pLastMsg;
+} obj_queue;
+
+void QueueInit(obj_queue * pQueue);
+
+void QueueAdd(obj_queue * pQueue, void * pMsg, int size);
+
+queue_entry * QueueGet(obj_queue * pQueue);
+
 #ifdef DEBUG
 #define TRACE(format, args...) \
     do \
@@ -297,6 +318,7 @@ typedef struct RoundInfo_
 
 
 typedef void (* MSG_LineReader)(char Buffer[256], RoundInfo * pArg);
+typedef void (* STG_Action)(RoundInfo * pArg);
 
 typedef struct MSG_NAME_TYPE_ENTRY_
 {
@@ -305,12 +327,14 @@ typedef struct MSG_NAME_TYPE_ENTRY_
     int NameLen;
     SER_MSG_TYPES MsgType;
     MSG_LineReader LinerReader;
+    STG_Action Action;
 } MSG_NAME_TYPE_ENTRY;
 
 /****************************************************************************************/
-SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
 
-SER_MSG_TYPES Msg_Read(const char * pMsg, int MaxLen, void * pData, RoundInfo * pRound);
+void ResponseAction(const char * pMsg, int size);
+
+SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
 
 void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound);
 
@@ -325,8 +349,6 @@ const char * GetCardPointName(CARD_POINT point);
 void Debug_ShowRoundInfo(RoundInfo *pRound);
 
 const char * GetCardColorName(CARD * pCard);
-
-const char * GetCardPointName(CARD_POINT point);
 
 void Debug_PrintChardInfo(CARD * pCard, int CardNum);
 

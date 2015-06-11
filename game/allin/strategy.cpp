@@ -14,10 +14,70 @@
 #include <errno.h>
 #include "Player.h"
 
-/* 每场500局 */
-#define MAX_ROUND_COUNT 500
-
 /* 负责处理策略 */
+
+obj_queue g_round_queue;
+
+void QueueInit(obj_queue * pQueue)
+{
+    memset(pQueue, 0, sizeof(obj_queue));
+    pthread_mutex_init(&pQueue->Lock, NULL);
+    return;
+}
+
+void QueueAdd(obj_queue * pQueue, void * pMsg, int size)
+{
+    queue_entry *pNewMsg = NULL;
+    do
+    {
+        pNewMsg = (queue_entry *)malloc(sizeof(queue_entry) + size);
+        if (pNewMsg == NULL)
+        {
+            TRACE("%lu %d\r\n", sizeof(queue_entry) + size, errno);
+            return;
+        }
+    } while (pNewMsg == NULL);
+
+    memset(pNewMsg, 0, sizeof(queue_entry) + size);
+
+    pNewMsg->pObjData = pNewMsg + 1;
+    pNewMsg->pNextMsg = NULL;
+    memcpy(pNewMsg->pObjData, pMsg, size);
+
+    pthread_mutex_lock(&pQueue->Lock);
+    if (pQueue->MsgCount == 0)
+    {
+        /* 两个必然同时为空 */
+        pQueue->pFirstMsg = pNewMsg;
+    }
+    else
+    {
+        pQueue->pLastMsg->pNextMsg = pNewMsg;
+    }
+    pQueue->pLastMsg = pNewMsg;
+    pQueue->MsgCount ++;
+    pthread_mutex_unlock(&pQueue->Lock);
+
+    return;
+}
+
+queue_entry * QueueGet(obj_queue * pQueue)
+{
+    queue_entry *pMsg = NULL;
+    pthread_mutex_lock(&pQueue->Lock);
+    if (pQueue->MsgCount > 0)
+    {
+        pMsg = pQueue->pFirstMsg;
+        pQueue->pFirstMsg = (queue_entry *)pQueue->pFirstMsg->pNextMsg;
+        if (pQueue->pFirstMsg == NULL)
+        {
+            pQueue->pLastMsg = NULL;
+        }
+        pQueue->MsgCount --;
+    }
+    pthread_mutex_unlock(&pQueue->Lock);
+    return pMsg;
+}
 
 /* 赢牌类型 */
 typedef struct STG_WIN_CARDS_
@@ -32,12 +92,9 @@ typedef struct STG_WIN_CARDS_
 typedef struct STG_DATA_
 {
     int RunningFlag;
-    int StgWriteIndex;
-    int StgReadIndex;
 
     pthread_mutex_t Lock;
     pthread_t subThread;
-    RoundInfo Rounds[MAX_ROUND_COUNT]; /* 500 * 13K */
 
     /* 赢牌的数据，一张大的数据表，方便快速索引 */
     STG_WIN_CARDS AllWinCards[CARD_TYPES_Butt][CARD_POINTT_BUTT];
@@ -72,6 +129,7 @@ void STG_Debug_PrintWinCardData(void)
     }
 }
 
+/* 载入版型数据库 */
 void STG_LoadStudyData(void)
 {
     int fid = -1;
@@ -99,6 +157,7 @@ void STG_LoadStudyData(void)
     return;
 }
 
+/* 保存学习到的牌型数据 */
 void STG_SaveStudyData(void)
 {
     int fid = -1;
@@ -115,20 +174,26 @@ void STG_SaveStudyData(void)
     return;
 }
 
-void STG_SaveRoundData(RoundInfo * pRoundInfo)
+/* 保存一局的数据 */
+void STG_SaveRoundData(RoundInfo * pRound)
 {
-    if (g_stg.StgWriteIndex >= MAX_ROUND_COUNT)
-    {
-        return;
-    }
-    STG_Lock();
-    memcpy(&g_stg.Rounds[g_stg.StgWriteIndex], pRoundInfo, sizeof(RoundInfo));
-    g_stg.StgWriteIndex ++; //= (g_stg.StgWriteIndex + 1) % MAX_ROUND_COUNT;
-    TRACE("Save round %d data.\r\n", g_stg.StgWriteIndex);
-    STG_Unlock();
+    static int RoundIndex = 0;
+    printf("====save round %d =========\r\n", pRound->RoundIndex);
+
+//    TRACE("Add round %d data. public card num %d;\r\n",
+//           pRound->RoundIndex, pRound->PublicCards.CardNum);
+
+    QueueAdd(&g_round_queue, pRound, sizeof(RoundInfo));
+
+    memset(pRound, 0, sizeof(RoundInfo));
+    //
+    RoundIndex ++;
+    pRound->RoundIndex = RoundIndex;
+
     return;
 }
 
+/* 查询全局数据库，取得指定牌型和最大点数的胜率  */
 int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
 {
     int WinNum = g_stg.AllWinCards[Type][MaxPoint].WinTimes;
@@ -146,9 +211,7 @@ int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
     return 0;
 }
 
-/*
-
-*/
+/* 处理手牌阶段的inquire */
 PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
 {
     int WinRation = 0;
@@ -167,6 +230,7 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
     return ACTION_check;
 }
 
+/* 根据给定的两红手牌和点数，看最大点数的牌是否在自己手里 */
 bool STG_IsMaxPointInHand(CARD_POINT MaxPoint, CARD Cards[2])
 {
     if (   (Cards[0].Point == MaxPoint)
@@ -197,13 +261,11 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
     WinRation = STG_CheckWinRation(Type, MaxPoint[Type]);
 
-    if ((WinRation >= 50) && STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards))
+    if ((WinRation >= 30) && STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards))
     {
-        #if 0
-        printf("Round %d allin:%d; \r\n", pRound->RoundIndex, WinRation,
-               Msg_GetCardTypeName(Type),
-               GetCardPointName(MaxPoint[Type]));
-        #endif
+//        printf("Round %d allin:%d; \r\n", pRound->RoundIndex, WinRation,
+//               Msg_GetCardTypeName(Type),
+//               GetCardPointName(MaxPoint[Type]));
         return ACTION_allin;
     }
     else
@@ -233,19 +295,17 @@ const char * STG_GetAction(RoundInfo * pRound)
     return GetActionName(Action);
 }
 
-RoundInfo * STG_GetNextRound(void)
+/* 处理inquire的回复 */
+void STG_InquireAction(RoundInfo * pRound)
 {
-    RoundInfo *pRound = NULL;
-    STG_Lock();
-    if (g_stg.StgReadIndex < g_stg.StgWriteIndex)
-    {
-        pRound = &g_stg.Rounds[g_stg.StgReadIndex];
-        g_stg.StgReadIndex ++;
-    }
-    STG_Unlock();
-    return pRound;
+    //TRACE("Response check.\r\n");
+    //const char* response = "check";
+    const char* response = STG_GetAction(pRound);
+    ResponseAction(response, strlen(response) + 1);
+    return;
 }
 
+/* 根据牌的大小排序 */
 void STG_SortCardByPoint(CARD * Cards, int CardNum)
 {
     int i = 0;
@@ -387,8 +447,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
     }
 
-
-
     //TRACE("STG_GetCardTypes:\r\n");
     for (index = CARD_POINTT_2; index < CARD_POINTT_A + 1; index ++)
     {
@@ -459,8 +517,8 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         }
     }
 
-    TRACE("\r\nSTG_GetCardTypes_end. four:%d;three:%d;pair:%d;straight:%d;color:%d;\r\n",
-           Four, Three, Pairs, Straight, (int)ColorType);
+//    TRACE("\r\nSTG_GetCardTypes_end. four:%d;three:%d;pair:%d;straight:%d;color:%d;\r\n",
+//           Four, Three, Pairs, Straight, (int)ColorType);
 
     if (Four > 0)
     {
@@ -511,9 +569,9 @@ void STG_AnalyseWinCard_AllCards(CARD AllCards[7], int WinIndex)
     {
         g_stg.AllWinCards[CardType][MaxPoints[CardType]].WinTimes ++;
     }
-    TRACE("Win Type %s, max point %d, %d;\r\n",
-          Msg_GetCardTypeName(CardType),
-          (int)MaxPoints[CardType], WinIndex);
+//    TRACE("Win Type %s, max point %d, %d;\r\n",
+//          Msg_GetCardTypeName(CardType),
+//          (int)MaxPoints[CardType], WinIndex);
 }
 
 /* 分析各选手的牌与公牌的组合，然后记录赢牌和出现牌的次数 */
@@ -544,24 +602,33 @@ void * STG_ProcessThread(void *pArgs)
 {
     int ret = 0;
     RoundInfo *pRound = NULL;
+    queue_entry * pQueueEntry = NULL;
 
     printf("STG_ProcessThread.\r\n");
 
     while (g_stg.RunningFlag == true)
     {
         /* 有新的round数据 */
-        pRound = STG_GetNextRound();
-        if (pRound == NULL)
+        //pRound = STG_GetNextRound();
+        pQueueEntry = QueueGet(&g_round_queue);
+        if (pQueueEntry == NULL)
         {
             usleep(1000);
             continue;
         }
 
-        Debug_ShowRoundInfo(pRound);
+        pRound = (RoundInfo *)pQueueEntry->pObjData;
 
-        //printf("Get round %d data to anylize.\r\n", pRound->RoundIndex);
+        //Debug_ShowRoundInfo(pRound);
+
+//        printf("Get round %d data to anylize. public card num %d;\r\n",
+//               pRound->RoundIndex, pRound->PublicCards.CardNum);
 
         STG_AnalyseWinCard(pRound);
+
+        free(pQueueEntry);
+        pQueueEntry = NULL;
+        pRound = NULL;
 
         /* 分析老的数据 */
     }
@@ -571,6 +638,8 @@ void * STG_ProcessThread(void *pArgs)
 void STG_Init(void)
 {
     int ret;
+
+    QueueInit(&g_round_queue);
 
     /* 加载学习数据 */
     STG_LoadStudyData();

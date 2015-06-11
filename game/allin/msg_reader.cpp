@@ -22,6 +22,8 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_Notify(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pArg);
+void STG_InquireAction(RoundInfo * pRound);
+void STG_SaveRoundData(RoundInfo * pRound);
 
 /*
 typedef enum SER_MSG_TYPES_
@@ -55,14 +57,16 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     (pid jetton money eol)0-5
     /seat eol
     ****************************************************************************/
-    {"seat/ \n" , "/seat \n", sizeof("seat/ \n") - 1, SER_MSG_TYPE_seat_info, Msg_LinerReader_Seat},
+    {"seat/ \n" , "/seat \n", sizeof("seat/ \n") - 1,
+    SER_MSG_TYPE_seat_info, Msg_LinerReader_Seat, NULL},
 
     /****************************************************************************
     blind/ eol
     (pid: bet eol)1-2
     /blind eol
     ****************************************************************************/
-    {"blind/ \n" , "/blind \n", sizeof("blind/ \n") - 1, SER_MSG_TYPE_blind, Msg_LinerReader_Blind},
+    {"blind/ \n" , "/blind \n", sizeof("blind/ \n") - 1,
+    SER_MSG_TYPE_blind, Msg_LinerReader_Blind, NULL},
 
     /****************************************************************************
     hold/ eol
@@ -70,7 +74,8 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     color point eol
     /hold eol
     ****************************************************************************/
-    {"hold/ \n" , "/hold \n", sizeof("hold/ \n") - 1, SER_MSG_TYPE_hold_cards, Msg_LinerReader_Hold},
+    {"hold/ \n" , "/hold \n", sizeof("hold/ \n") - 1,
+    SER_MSG_TYPE_hold_cards, Msg_LinerReader_Hold, NULL},
 
     /****************************************************************************
     inquire/ eol
@@ -78,7 +83,8 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     total pot: num eol
     /inquire eol
     ****************************************************************************/
-    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1, SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire},
+    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
+    SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire, STG_InquireAction},
 
     /****************************************************************************
     flop/ eol
@@ -87,21 +93,24 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     color point eol
     /flop eol
     ****************************************************************************/
-    {"flop/ \n" , "/flop \n", sizeof("flop/ \n") - 1, SER_MSG_TYPE_flop, Msg_LinerReader_Flop},
+    {"flop/ \n" , "/flop \n", sizeof("flop/ \n") - 1,
+    SER_MSG_TYPE_flop, Msg_LinerReader_Flop, NULL},
 
     /****************************************************************************
     turn/ eol
     color point eol
     /turn eol
     ****************************************************************************/
-    {"turn/ \n" , "/turn \n", sizeof("turn/ \n") - 1, SER_MSG_TYPE_turn, Msg_LinerReader_Turn},
+    {"turn/ \n" , "/turn \n", sizeof("turn/ \n") - 1,
+    SER_MSG_TYPE_turn, Msg_LinerReader_Turn, NULL},
 
     /****************************************************************************
     river/ eol
     color point eol
     /river eol
     ****************************************************************************/
-    {"river/ \n" , "/river \n", sizeof("river/ \n") - 1, SER_MSG_TYPE_river, Msg_LinerReader_River},
+    {"river/ \n" , "/river \n", sizeof("river/ \n") - 1,
+    SER_MSG_TYPE_river, Msg_LinerReader_River, NULL},
 
     /*****************************************************************************
     showdown/ eol
@@ -111,14 +120,16 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     (rank: pid color point color point nut_hand eol)2-8
     /showdown eol
     *****************************************************************************/
-    {"showdown/ \n" , "/showdown \n", sizeof("showdown/ \n") - 1, SER_MSG_TYPE_showdown, Msg_LinerReader_ShowDown},
+    {"showdown/ \n" , "/showdown \n", sizeof("showdown/ \n") - 1,
+    SER_MSG_TYPE_showdown, Msg_LinerReader_ShowDown, NULL},
 
     /****************************************************************************
     pot-win/ eol
     (pid: num eol)0-8
     /pot-win eol
     *****************************************************************************/
-    {"pot-win/ \n" , "/pot-win \n", sizeof("seat/ \n") - 1, SER_MSG_TYPE_pot_win, Msg_LinerReader_PotWin},
+    {"pot-win/ \n" , "/pot-win \n", sizeof("seat/ \n") - 1,
+    SER_MSG_TYPE_pot_win, Msg_LinerReader_PotWin, STG_SaveRoundData},
 
     /*****************************************************************************
     notify/ eol
@@ -126,12 +137,13 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     total pot: num eol
     /notify eol
     *****************************************************************************/
-    {"notify/ \n" , "/notify \n", sizeof("notify/ \n") - 1, SER_MSG_TYPE_notify, Msg_LinerReader_Notify},
+    {"notify/ \n" , "/notify \n", sizeof("notify/ \n") - 1,
+    SER_MSG_TYPE_notify, Msg_LinerReader_Notify, NULL},
 
     /*****************************************************************************
     game-over eol
     *****************************************************************************/
-    {"game-over \n" , NULL, 0, SER_MSG_TYPE_game_over, Msg_LinerReader_GameOver},
+    {"game-over \n" , NULL, 0, SER_MSG_TYPE_game_over, Msg_LinerReader_GameOver, NULL},
 };
 
 SER_MSG_TYPES Msg_GetMsgTypeByMsgName(const char * pMsgName)
@@ -545,13 +557,6 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
         sscanf(Buffer, "total pot:%d", &Jetton);
         pRound->Inquires[pRound->InquireCount].TotalPot = Jetton;
         pRound->InquireCount ++;
-        {
-            extern int m_socket_id;
-            //TRACE("Response check.\r\n");
-            //const char* response = "check";
-            const char* response = STG_GetAction(pRound);
-            send(m_socket_id, response, strlen(response) + 1, 0);
-        }
         return;
     }
     Msg_ReadInquireInfoEx(Buffer, &pRound->Inquires[pRound->InquireCount]);
@@ -622,6 +627,9 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
 {
     //TRACE("%s %d %d \r\n", Buffer, pRound->ShowDown.CardNum, pRound->ShowDown.PlayerNum);
 
+//    printf("[%d]Add round %d data. public card num %d;\r\n",
+//       __LINE__, pRound->RoundIndex, pRound->PublicCards.CardNum);
+
     pRound->RoundStatus = SER_MSG_TYPE_showdown;
 
     /* 先读取5张公牌 */
@@ -676,22 +684,14 @@ void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pRound)
     return;
 }
 
+/* 如果两个人的牌是一样的，pot win有两条或者多条数据，因此不能在解析一条数据以后就保存round数据 */
 void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pRound)
 {
     static int RoundIndex = 0;
 
     /* 读取彩池信息 */
     Msg_ReadPlayJettonInfo(&pRound->PotWin, Buffer);
-    //
-    TRACE("====save round %d =========\r\n", pRound->RoundIndex);
-//  Debug_ShowRoundInfo(pRound);
-    STG_SaveRoundData(pRound);
-
-    RoundIndex ++;
-    TRACE("=============Round %d =========\r\n", RoundIndex);
-    memset(pRound, 0, sizeof(RoundInfo));
-    pRound->RoundIndex = RoundIndex;
-
+    printf("%s win %d;\r\n", pRound->PotWin.PlayerID, pRound->PotWin.Jetton);
     //
     return;
 }
@@ -713,13 +713,17 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
         pMsgEntry = &AllMsgTypes[Type];
         pRound->CurrentMsgType = Type;
         Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
-//        TRACE("%s [%d]\r\n", Buffer, ReadNum);
+        TRACE("[%d][%s]\r\n", ReadNum, Buffer);
         while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
         {
-            //TRACE("%s [%d]\r\n", Buffer, ReadNum);
+            TRACE("[%d][%s]\r\n", ReadNum, Buffer);
             if (strcmp(Buffer, pMsgEntry->pEndName) == 0)
             {
                 Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
+                if (pMsgEntry->Action)
+                {
+                    pMsgEntry->Action(pRound);
+                }
                 break;
             }
             if (pMsgEntry->LinerReader)
@@ -814,7 +818,7 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
 
 void Debug_ShowRoundInfo(RoundInfo *pRound)
 {
-    printf("===============round %d start=================\r\n", pRound->RoundIndex);
+    //printf("===============round %d start=================\r\n", pRound->RoundIndex);
     TRACE("===============round %d start=================\r\n", pRound->RoundIndex);
     Debug_PrintShowDown(&pRound->ShowDown);
     TRACE("===============round %d end=================\r\n", pRound->RoundIndex);
