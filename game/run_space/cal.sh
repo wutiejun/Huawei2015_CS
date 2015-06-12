@@ -2,9 +2,9 @@
 
 function CalTypeWinRation()
 {
-	echo "Card type win info:"
+	printf "\r\nCard type win info:\r\n"
 	printf "%-18s: %5s %5s\r\n" "Type" "Total" "Win";
-	echo "===========================================";
+	printf "===========================================\r\n";
 	all_total=0;
 	all_win=0;
 	for type in ROYAL_FLUSH STRAIGHT_FLUSH FOUR_OF_A_KIND FULL_HOUSE FLUSH STRAIGHT THREE_OF_A_KIND TWO_PAIR ONE_PAIR HIGH_CARD; do 
@@ -14,7 +14,7 @@ function CalTypeWinRation()
 		all_total=`expr $all_total + $total`;
 		all_win=`expr $all_win + $win`;
 	done
-	echo "===========================================";
+	printf "===========================================\r\n";
 	printf "%-18s: %5d %5d\r\n" "All Total" $all_total $all_win;
 }
 
@@ -63,26 +63,46 @@ function CalTypeDevRation()
 
 function CalCardShowAndWinRation()
 {
-	echo "Card point win info:"
-	printf "Point  Show  Win\r\n"
+	printf "\r\nCard point win info:\r\n"
+	printf "Point  Show   Win\r\n"
 	all_total=0;
 	all_win=0;
-	echo "===========================================";
+	printf "===========================================\r\n";
 	for card in 2 3 4 5 6 7 8 9 10 J Q K A; do
 		#echo $card 		
-		show_times=$(cat log.txt | grep "^[1-8]:" | grep -w "$card" | wc -l);
+		show_times=$(cat log.txt | grep "^[1-8]:" | cut -c3- | grep -w "$card" | wc -l);
 		win_times=$(cat log.txt | grep "1:" | grep -w "$card" | wc -l);
 		printf "%-5s %5d %5d\r\n" $card $show_times $win_times
 		all_total=`expr $all_total + $show_times`;
 		all_win=`expr $all_win + $win_times`;
 	done
-	echo "===========================================";
+	printf "===========================================\r\n";
 	printf "Total:%5d %5d\r\n" $all_total $all_win;
+}
+
+function CalPlayerWinRation()
+{
+	printf "\r\nPlayer win info:\r\n"
+	printf "Player   Win\r\n"
+	all_win=0;
+	printf "===========================================\r\n";
+	for player in 1001 1002 1003 1004 1005 1006 1007 1008; do
+		#echo $card 	
+		win_times=$(cat log.txt | grep "^[1-8]:" | grep -w "1:" | grep -w "$player"  | wc -l);
+		if [ "$win_times" != "0" ]; then
+			printf "%-5s: %5d\r\n" $player $win_times
+		fi
+		all_win=`expr $all_win + $win_times`;
+	done
+	printf "===========================================\r\n";
+	printf "Total: %5d\r\n" $all_win;
 }
 
 CalTypeWinRation
 
 CalCardShowAndWinRation
+
+CalPlayerWinRation
 
 #CalTypeDevRation
 

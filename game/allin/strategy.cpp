@@ -143,7 +143,7 @@ typedef struct STG_DATA_
     pthread_t subThread;
 
     /* 赢牌的数据，一张大的数据表，方便快速索引 */
-    STG_WIN_CARDS AllWinCards[CARD_TYPES_Butt][CARD_POINTT_BUTT];
+    STG_WIN_CARDS AllWinCards[8][CARD_TYPES_Butt][CARD_POINTT_BUTT];
 } STG_DATA;
 
 STG_DATA g_stg = {0};
@@ -162,15 +162,20 @@ void STG_Debug_PrintWinCardData(void)
 {
     int Type;
     int Point;
-    for (Type =  CARD_TYPES_High; Type < CARD_TYPES_Butt; Type ++)
+    int UserNum;
+    for (UserNum = 1; UserNum < 8; UserNum ++)
     {
-        for (Point = CARD_POINTT_2; Point < CARD_POINTT_BUTT; Point ++)
+        TRACE("Player num:%d\r\n", UserNum);
+        for (Type =  CARD_TYPES_High; Type < CARD_TYPES_Butt; Type ++)
         {
-            TRACE("Type:%s Max point: %s ShowTimes:%5d; WinTimes:%5d;\r\n",
-                   Msg_GetCardTypeName((CARD_TYPES)Type),
-                   GetCardPointName((CARD_POINT)Point),
-                   g_stg.AllWinCards[Type][Point].ShowTimes,
-                   g_stg.AllWinCards[Type][Point].WinTimes);
+            for (Point = CARD_POINTT_2; Point < CARD_POINTT_BUTT; Point ++)
+            {
+                TRACE("Type:%s Max: %s Show:%5d; Win:%5d;\r\n",
+                       Msg_GetCardTypeName((CARD_TYPES)Type),
+                       GetCardPointName((CARD_POINT)Point),
+                       g_stg.AllWinCards[UserNum][Type][Point].ShowTimes,
+                       g_stg.AllWinCards[UserNum][Type][Point].WinTimes);
+            }
         }
     }
 }
@@ -215,8 +220,8 @@ void STG_SaveStudyData(void)
     }
     write(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
     close(fid);
-    STG_Debug_PrintWinCardData();
     TRACE("Save game_win_data.bin\r\n");
+    STG_Debug_PrintWinCardData();
     return;
 }
 
@@ -224,10 +229,8 @@ void STG_SaveStudyData(void)
 void STG_SaveRoundData(RoundInfo * pRound)
 {
     static int RoundIndex = 0;
-    printf("====save round %d =========\r\n", pRound->RoundIndex);
 
-//    TRACE("Add round %d data. public card num %d;\r\n",
-//           pRound->RoundIndex, pRound->PublicCards.CardNum);
+    printf("====save round %d =========\r\n", pRound->RoundIndex);
 
     QueueAdd(&g_round_queue, pRound, sizeof(RoundInfo));
 
@@ -240,16 +243,17 @@ void STG_SaveRoundData(RoundInfo * pRound)
 }
 
 /* 查询全局数据库，取得指定牌型和最大点数的胜率  */
-int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
+int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint, int PlayerNum)
 {
-    int WinNum = g_stg.AllWinCards[Type][MaxPoint].WinTimes;
-    int ShowNum = g_stg.AllWinCards[Type][MaxPoint].ShowTimes;
-    #if 0
-    printf("Check Win Ration: %s %s: %d / %d;\r\n",
-          Msg_GetCardTypeName(Type),
-          GetCardPointName(MaxPoint),
-          WinNum, ShowNum);
-    #endif
+    int WinNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].WinTimes;
+    int ShowNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].ShowTimes;
+
+//    printf("Check Win Ration[%d]: %s %s: %d / %d;\r\n",
+//           PlayerNum,
+//          Msg_GetCardTypeName(Type),
+//          GetCardPointName(MaxPoint),
+//          WinNum, ShowNum);
+
     if (ShowNum > 0)
     {
         return (WinNum * 100) / ShowNum;
@@ -258,7 +262,7 @@ int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint)
 }
 
 /* 仅通过牌型来查询胜率，在不同场景下有比较好的优势，如解决一些机器人 */
-int STG_CheckWinRationByType(CARD_TYPES Type)
+int STG_CheckWinRationByType(CARD_TYPES Type, int PlayerNum)
 {
     int index = 0;
     int WinNum = 0;
@@ -267,8 +271,8 @@ int STG_CheckWinRationByType(CARD_TYPES Type)
     /* 读取数据，不用上锁 */
     for (index = CARD_POINTT_2; index < CARD_POINTT_BUTT; index ++)
     {
-        WinNum += g_stg.AllWinCards[Type][index].WinTimes;
-        ShowNum += g_stg.AllWinCards[Type][index].ShowTimes;
+        WinNum += g_stg.AllWinCards[PlayerNum - 1][Type][index].WinTimes;
+        ShowNum += g_stg.AllWinCards[PlayerNum - 1][Type][index].ShowTimes;
     }
     if (ShowNum > 0)
     {
@@ -300,7 +304,7 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
     AllCards[1] = pRound->HoldCards.Cards[1];
 
     Type = STG_GetCardTypes(AllCards, 2, MaxPoint);
-    WinRation = STG_CheckWinRation(Type, MaxPoint[Type]);
+    WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
     if (WinRation > 50)
     {
         return ACTION_raise;
@@ -337,7 +341,7 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     AllCards[5] = pRound->HoldCards.Cards[0];
     AllCards[6] = pRound->HoldCards.Cards[1];
     Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
-    WinRation = STG_CheckWinRation(Type, MaxPoint[Type]);
+    WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
 
     if ((WinRation >= 30) && STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards))
     {
@@ -392,7 +396,7 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
 }
 
 /* 处理inquire的回复 */
-void STG_InquireAction(RoundInfo * pRound)
+void STG_Inquire_Action(RoundInfo * pRound)
 {
     //TRACE("Response check.\r\n");
     //const char* response = "check";
@@ -457,8 +461,7 @@ CARD_TYPES SET_GetStraightType(CARD FlushCards[8], int CardNum, CARD_POINT * pMa
     int StriaghtNum = 1;
     int MaxIndex = 0;
     CARD_POINT PrePoint = CARD_POINTT_Unknow;
-    //printf("Get %d card for flush:\r\n", CardNum);
-    //print_card(FlushCards, CardNum);
+
     for (index = 0; index < CardNum; index ++)
     {
         if (FlushCards[index].Point == CARD_POINTT_Unknow)
@@ -471,7 +474,7 @@ CARD_TYPES SET_GetStraightType(CARD FlushCards[8], int CardNum, CARD_POINT * pMa
             PrePoint =  FlushCards[index].Point;
             continue;
         }
-        //printf("%d %d %d %d\r\n", index, (int)PrePoint, StriaghtNum,(int)FlushCards[index].Point);
+
         if (FlushCards[index].Point == PrePoint + 1)
         {
             MaxIndex = index;
@@ -527,8 +530,6 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
 
     for (index = 0; index < CardNum; index ++)
     {
-        //TRACE("%d:%s %s\r\n", index, GetCardColorName(&pCards[index]),
-        //       GetCardPointName(pCards[index].Point));
         AllColors[pCards[index].Color] ++;
         AllPoints[pCards[index].Point] ++;
 
@@ -655,19 +656,20 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     return CARD_TYPES_High;
 }
 
-void STG_AnalyseWinCard_AllCards(CARD AllCards[7], int WinIndex)
+void STG_AnalyseWinCard_AllCards(CARD AllCards[7], int WinIndex, int PlayerNum)
 {
     CARD_POINT MaxPoints[CARD_TYPES_Butt] = {(CARD_POINT)0};
     CARD_TYPES CardType = CARD_TYPES_None;
     CardType = STG_GetCardTypes(AllCards, 7, MaxPoints);
     //
-    g_stg.AllWinCards[CardType][MaxPoints[CardType]].ShowTimes ++;
+    g_stg.AllWinCards[PlayerNum - 1][CardType][MaxPoints[CardType]].ShowTimes ++;
     if (WinIndex == 1)
     {
-        g_stg.AllWinCards[CardType][MaxPoints[CardType]].WinTimes ++;
+        g_stg.AllWinCards[PlayerNum - 1][CardType][MaxPoints[CardType]].WinTimes ++;
     }
-//    TRACE("Win Type %s, max point %d, %d;\r\n",
-//          Msg_GetCardTypeName(CardType),
+//    printf("Save analyse data:[%d]Type %s, max %d, index %d;\r\n",
+//           PlayerNum,
+//           Msg_GetCardTypeName(CardType),
 //          (int)MaxPoints[CardType], WinIndex);
 }
 
@@ -678,6 +680,7 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
     int index = 0;
     MSG_SHOWDWON_PLAYER_CARD * pPlayCard = NULL;
 
+//    printf("pRound->ShowDown.PlayerNum =%d;\r\n",  pRound->ShowDown.PlayerNum );
     for (index = 0; index < pRound->ShowDown.PlayerNum - 1; index ++)
     {
         /* 牌型算法要对AllCards排序，需要每次都重新赋值 */
@@ -689,7 +692,9 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
         //Debug_PrintShowDown(&pRound->ShowDown);
         //Debug_PrintChardInfo(AllCards, 7);
         //
-        STG_AnalyseWinCard_AllCards(AllCards, pRound->ShowDown.Players[index].Index);
+        STG_AnalyseWinCard_AllCards(AllCards,
+                                    pRound->ShowDown.Players[index].Index,
+                                    pRound->ShowDown.PlayerNum);
     }
 }
 
@@ -716,7 +721,7 @@ void * STG_ProcessThread(void *pArgs)
 
         pRound = (RoundInfo *)pQueueEntry->pObjData;
 
-        //Debug_ShowRoundInfo(pRound);
+        Debug_ShowRoundInfo(pRound);
 
 //        printf("Get round %d data to anylize. public card num %d;\r\n",
 //               pRound->RoundIndex, pRound->PublicCards.CardNum);
@@ -760,3 +765,4 @@ void STG_Dispose(void)
     STG_SaveStudyData();
     return;
 }
+

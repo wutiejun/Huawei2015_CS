@@ -290,6 +290,7 @@ typedef struct MSG_INQUIRE_PLAYER_ACTION_
     PLAYER_Action Action;
 } MSG_INQUIRE_PLAYER_ACTION;
 
+/* 询问玩家时，每次最多8个玩家，如果一次询问中，多于8个的，循环覆盖即可 */
 typedef struct MSG_INQUIRE_INFO_
 {
     int PlayerNum;

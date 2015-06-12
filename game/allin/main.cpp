@@ -16,6 +16,7 @@
 #include "Player.h"
 
 int m_socket_id = -1;
+int g_RunFlag = true;
 pthread_mutex_t LogLock;
 RoundInfo LocalRoundInfo = {(SER_MSG_TYPES)0};
 
@@ -58,11 +59,11 @@ void TRACE_Log(const char *file, int len, const char *fmt, ...)
 
 bool server_msg_process(int size, const char* msg)
 {
-    if (NULL != strstr(msg, "game-over"))
-    {
-        printf("My game over!\r\n");
-        return false;
-    }
+//    if (NULL != strstr(msg, "game-over"))
+//    {
+//        printf("My game over!\r\n");
+//        return false;
+//    }
 
     //SER_MSG_TYPES msg_type = Msg_Read(msg, size, NULL, &LocalRoundInfo);
 
@@ -117,9 +118,11 @@ void StartGame(void)
     STG_Init();
 }
 
-void ExitGame(void)
+void ExitGame(RoundInfo * pRound)
 {
+    printf("My game over!\r\n");
     STG_Dispose();
+    g_RunFlag = false;
 }
 
 int main(int argc, char* argv[])
@@ -189,7 +192,8 @@ int main(int argc, char* argv[])
     StartGame();
 
     /* ¿ªÊ¼ÓÎÏ· */
-    while(1)
+    g_RunFlag = true;
+    while(g_RunFlag)
     {
         char buffer[4096] = {0};
         int size = recv(m_socket_id, buffer, sizeof(buffer) - 1, 0);

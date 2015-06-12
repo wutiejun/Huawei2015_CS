@@ -22,8 +22,11 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_Notify(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pArg);
 void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pArg);
-void STG_InquireAction(RoundInfo * pRound);
+void Msg_ReadSeatInfo_EndAction(RoundInfo *pRound);
+void Msg_Inquire_Action(RoundInfo * pRound);
+void STG_Inquire_Action(RoundInfo * pRound);
 void STG_SaveRoundData(RoundInfo * pRound);
+void ExitGame(RoundInfo * pRound);
 
 /*
 typedef enum SER_MSG_TYPES_
@@ -58,7 +61,7 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     /seat eol
     ****************************************************************************/
     {"seat/ \n" , "/seat \n", sizeof("seat/ \n") - 1,
-    SER_MSG_TYPE_seat_info, Msg_LinerReader_Seat, NULL},
+    SER_MSG_TYPE_seat_info, Msg_LinerReader_Seat, Msg_ReadSeatInfo_EndAction},
 
     /****************************************************************************
     blind/ eol
@@ -84,7 +87,7 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     /inquire eol
     ****************************************************************************/
     {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire, STG_InquireAction},
+    SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
 
     /****************************************************************************
     flop/ eol
@@ -143,7 +146,8 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     /*****************************************************************************
     game-over eol
     *****************************************************************************/
-    {"game-over \n" , NULL, 0, SER_MSG_TYPE_game_over, Msg_LinerReader_GameOver, NULL},
+    {"game-over \n" , NULL, 0, SER_MSG_TYPE_game_over,
+    Msg_LinerReader_GameOver, ExitGame},
 };
 
 SER_MSG_TYPES Msg_GetMsgTypeByMsgName(const char * pMsgName)
@@ -268,6 +272,12 @@ SCAN_PLAYER:
     pPlayerSeat->Money = PlayerSeat.Money;
     pSetInfo->PlayerNum ++;
     return;
+}
+
+void Msg_ReadSeatInfo_EndAction(RoundInfo *pRound)
+{
+    //pRound->SeatInfo.PlayerNum --;
+    //printf("Read seat num:%d\r\n", pRound->SeatInfo.PlayerNum);
 }
 
 CARD_POINT GetCardPoint(char CardPoint[4])
@@ -563,6 +573,17 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
     return;
 }
 
+void Msg_Inquire_Action(RoundInfo * pRound)
+{
+    #if 0
+    char ActionBufer[128] = "check";
+    ResponseAction(ActionBufer, strlen(ActionBufer));
+    return;
+    #else // CHECK
+    return STG_Inquire_Action(pRound);
+    #endif
+}
+
 void Msg_LinerReader_Flop(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
@@ -633,7 +654,7 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
     pRound->RoundStatus = SER_MSG_TYPE_showdown;
 
     /* 先读取5张公牌 */
-    if ((pRound->ShowDown.CardNum >= 1) && (pRound->ShowDown.CardNum <= 5))
+    if ((pRound->ShowDown.CardNum >= 1) && (pRound->ShowDown.CardNum < 5))
     {
         CARD *pCard = NULL;
         pCard = &pRound->ShowDown.PublicCards[pRound->ShowDown.CardNum - 1];
@@ -644,8 +665,9 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
         return;
     }
 
-    /* 读取每个人的手牌 */
-    if ((pRound->ShowDown.PlayerNum >= 1) && (pRound->ShowDown.PlayerNum <= 8))
+    /* 读取每个人的手牌，个数不会超过seat时的个数 */
+    if (   (pRound->ShowDown.PlayerNum >= 1)
+        && (pRound->ShowDown.PlayerNum < pRound->SeatInfo.PlayerNum))
     {
         MSG_SHOWDWON_PLAYER_CARD *pPlayerCard = NULL;
         pPlayerCard = &pRound->ShowDown.Players[pRound->ShowDown.PlayerNum - 1];
@@ -681,6 +703,7 @@ void Msg_LinerReader_Notify(char Buffer[256], RoundInfo * pRound)
 void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pRound)
 {
     /* 可以将数据保存到磁盘 */
+
     return;
 }
 
@@ -714,9 +737,14 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
         pRound->CurrentMsgType = Type;
         Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
         TRACE("[%d][%s]\r\n", ReadNum, Buffer);
+        if (Type == SER_MSG_TYPE_game_over)
+        {
+            pMsgEntry->Action(pRound);
+            break;
+        }
         while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
         {
-            TRACE("[%d][%s]\r\n", ReadNum, Buffer);
+            //printf("[%d][%s]\r\n", ReadNum, Buffer);
             if (strcmp(Buffer, pMsgEntry->pEndName) == 0)
             {
                 Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
