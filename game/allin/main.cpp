@@ -74,9 +74,17 @@ bool server_msg_process(int size, const char* msg)
     return true;
 }
 
+const char * g_Action = NULL;
+
 void ResponseAction(const char * pMsg, int size)
 {
     int SendNum = 0;
+    if (g_Action != NULL)
+    {
+        pMsg = g_Action;
+        size = strlen(g_Action);
+    }
+
     SendNum = send(m_socket_id, pMsg, size, 0);
     if (SendNum != size)
     {
@@ -129,9 +137,14 @@ int main(int argc, char* argv[])
 {
     int ret = 0;
 
-    if(argc != 6)
+    if (argc == 7)
     {
-        return -1;
+        g_Action = argv[6];
+    }
+    else if (argc != 6 )
+    {
+        printf("Game args error!\r\n");
+        return 0;
     }
 
     signal(SIGSEGV, OnSigSem);

@@ -177,25 +177,15 @@ typedef struct CARD_
     CARD_COLOR Color;
 } CARD;
 
-typedef enum CLIENT_MSG_TYPES_
-{
-    // player到服务器的消息
-    CLIENT_MSG_TYPES_Reg,
-    CLIENT_MSG_TYPES_ACT_check,
-    CLIENT_MSG_TYPES_ACT_call,
-    CLIENT_MSG_TYPES_ACT_raise,
-    CLIENT_MSG_TYPES_ACT_all_in,
-    CLIENT_MSG_TYPES_ACT_fold,
-} CLIENT_MSG_TYPES;
-
 /* 玩家的处理策略 */
 typedef enum PLAYER_Action_
 {
+    ACTION_fold,
     ACTION_check,       /* 让牌，即在前面的玩家，什么也不做，把机会给后面的玩家 */
     ACTION_call,        /* 跟进，即前面有人raise，即不re-raise，也不弃牌，则call， */
-    ACTION_allin,
     ACTION_raise,
-    ACTION_fold,
+    ACTION_allin,
+    //
 } PLAYER_Action;
 
 typedef enum PLAYER_SEAT_TYPES_
@@ -366,8 +356,6 @@ void STG_SaveStudyData(void);
 void STG_Init(void);
 
 void STG_Dispose(void);
-
-int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint);
 
 const char * STG_GetAction(RoundInfo * pRound);
 

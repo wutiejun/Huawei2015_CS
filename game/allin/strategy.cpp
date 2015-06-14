@@ -16,38 +16,13 @@
 
 /* 负责处理策略 */
 
-/***************************************************************
-Card type win info:
-Type              : Total   Win
-===========================================
-ROYAL_FLUSH       :     0     0
-STRAIGHT_FLUSH    :     5     5
-FOUR_OF_A_KIND    :    14    14
-FULL_HOUSE        :   267   203
-FLUSH             :   432   228
-STRAIGHT          :   574   369
-THREE_OF_A_KIND   :   564   274
-TWO_PAIR          :  2822   445
-ONE_PAIR          :  5327   160
-HIGH_CARD         :  2126     0
-===========================================
-All Total         : 12131  1698
-****************************************************************/
-
-/* 各类版型出现的机率，统计3场的概率，先写死在这里 */
-int g_CardTypeRation[CARD_TYPES_Butt] =
+/* 各种对策方案 */
+typedef enum STG_ACTION_
 {
-    0,
-    100 * 5 /12131,         // 0
-    100 * 14 /12131,        // 0
-    100 * 267 /12131,       // 2
-    100 * 432 /12131,       // 3
-    100 * 574 /12131,       // 4
-    100 * 564 /12131,       // 4
-    100 * 2822 /12131,      // 23
-    100 * 5327 /12131,      // 43
-    100 * 2126 /12131,      // 17
+    STG_Fold,  /* 默认弃牌，损失最小 */
+
 };
+
 
 obj_queue g_round_queue;
 
@@ -188,10 +163,10 @@ void STG_LoadStudyData(void)
 
     memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
 
-    fid = open("game_win_data.bin", O_RDONLY);
+    fid = open("db.bin", O_RDONLY);
     if (fid == -1)
     {
-        TRACE("Load game_win_data.bin error.\r\n");
+        TRACE("Load db.bin error.\r\n");
         return;
     }
 
@@ -199,7 +174,7 @@ void STG_LoadStudyData(void)
     if (read_size != sizeof(g_stg.AllWinCards))
     {
         memset(&g_stg.AllWinCards, 0, sizeof(g_stg.AllWinCards));
-        TRACE("Load game_win_data.bin error.\r\n");
+        TRACE("Load db.bin error.\r\n");
     }
     close(fid);
 
@@ -212,15 +187,15 @@ void STG_LoadStudyData(void)
 void STG_SaveStudyData(void)
 {
     int fid = -1;
-    fid = open("game_win_data.bin", O_CREAT|O_WRONLY|O_TRUNC|O_SYNC);
+    fid = open("db.bin", O_CREAT|O_WRONLY|O_TRUNC|O_SYNC);
     if (fid == -1)
     {
-        TRACE("Save game_win_data.bin error.\r\n");
+        TRACE("Save db.bin error.\r\n");
         return;
     }
     write(fid, &g_stg.AllWinCards, sizeof(g_stg.AllWinCards));
     close(fid);
-    TRACE("Save game_win_data.bin\r\n");
+    TRACE("Save db.bin\r\n");
     STG_Debug_PrintWinCardData();
     return;
 }
@@ -245,6 +220,7 @@ void STG_SaveRoundData(RoundInfo * pRound)
 /* 查询全局数据库，取得指定牌型和最大点数的胜率  */
 int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint, int PlayerNum)
 {
+    printf("STG_CheckWinRation:%d %d %d;\r\n", PlayerNum, (int)Type, (int)MaxPoint);
     int WinNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].WinTimes;
     int ShowNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].ShowTimes;
 
@@ -298,7 +274,7 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
 {
     int WinRation = 0;
     CARD AllCards[2];
-    CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    CARD_POINT MaxPoint[CARD_TYPES_Butt];// = {(CARD_POINT)0};
     CARD_TYPES Type = CARD_TYPES_None;
     AllCards[0] = pRound->HoldCards.Cards[0];
     AllCards[1] = pRound->HoldCards.Cards[1];
@@ -330,7 +306,7 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
 {
     int WinRation = 0;
     CARD AllCards[7];
-    CARD_POINT MaxPoint[CARD_TYPES_Butt];
+    CARD_POINT MaxPoint[CARD_TYPES_Butt];// = {(CARD_POINT)0};
     CARD_TYPES Type = CARD_TYPES_None;
     bool IsMaxInHand = false;
     AllCards[0] = pRound->PublicCards.Cards[0];
@@ -587,7 +563,7 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
         {
             Three ++;
             MaxPoints[CARD_TYPES_Three_Of_A_Kind] = (CARD_POINT)index;
-            if (Pairs >= 1)
+            if ((Pairs >= 1) || (Three >= 2))
             {
                 MaxPoints[CARD_TYPES_Full_House] = (CARD_POINT)index;
             }

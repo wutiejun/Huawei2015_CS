@@ -1,5 +1,7 @@
 #!/bin/bash
 
+. ./evn.sh
+
 # user 1
 export "PLAYER1_IP"=127.0.0.1
 export "PLAYER1_PORT"=6001
@@ -41,16 +43,10 @@ export "PLAYER8_PORT"=6008
 export "PLAYER8_ID"=1008
 
 # Start Server
-./gameserver -gip 127.0.0.1 -seq replay -r 30 -d 1 -m 10000 -b 50 -t 2000 -h 500 0</dev/null 1>/dev/null 2>/dev/null &
+../gameserver -gip $ser_ip -seq replay -r $reg -d $delay -m $money -b $blind -t $jetton -h $hand 0</dev/null 1>/dev/null 2>/dev/null &
 
 # Start all users
-if [ "$1" == "" ]; then
-	./game 127.0.0.1 6000 127.0.0.1 6001 1001  &
-fi
-
-if [ "$1" == "check" ]; then
-	./check 127.0.0.1 6000 127.0.0.1 6001 1001  &
-fi
+./game 127.0.0.1 6000 127.0.0.1 6001 1001  $1 &
 
 #./game 127.0.0.1 6000 127.0.0.2 6002 1002 &
 ./check 127.0.0.1 6000 127.0.0.2 6002 1002 &
