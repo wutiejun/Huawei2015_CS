@@ -485,16 +485,19 @@ PLAYER_Action GetAction(const char * ActionNAme)
 /*
 typedef enum PLAYER_Action_
 {
+    ACTION_NONE,
+    ACTION_fold,
     ACTION_check,
     ACTION_call,
-    ACTION_allin,
     ACTION_raise,
-    ACTION_fold,
+    ACTION_allin,
+    ACTION_BUTTON,
+    //
 } PLAYER_Action;
 */
 const char * GetActionName(PLAYER_Action act)
 {
-    const char * Actions[] = {"check", "call", "all_in", "rais", "fold"};
+    const char * Actions[ACTION_BUTTON] = {"fold", "check", "call", "raise", "all_in", "fold"};
     return Actions[act];
 }
 

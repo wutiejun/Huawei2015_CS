@@ -12,6 +12,7 @@
 /* check机器人 */
 
 int m_socket_id = -1;
+const char *g_Action = NULL;
 
 bool server_msg_process(int size, const char* msg)
 {
@@ -24,6 +25,10 @@ bool server_msg_process(int size, const char* msg)
     if (NULL != strstr(msg, "inquire/"))
     {
         const char* response = "check";
+        if (g_Action != NULL)
+        {
+            response = g_Action;
+        }
 //        usleep(400 * 1000);
         send(m_socket_id, response, (int)strlen(response)+1, 0);
     }
@@ -36,9 +41,14 @@ int main(int argc, char* argv[])
     int ret = 0;
     pthread_t subThread;
 
-    if(argc != 6)
+    if (argc == 7)
     {
-        return -1;
+        g_Action = argv[6];
+    }
+    else if (argc != 6 )
+    {
+        printf("Game args error!\r\n");
+        return 0;
     }
 
     /* 提取命令行参数 */

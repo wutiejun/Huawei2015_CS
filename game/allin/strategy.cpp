@@ -16,14 +16,6 @@
 
 /* 负责处理策略 */
 
-/* 各种对策方案 */
-typedef enum STG_ACTION_
-{
-    STG_Fold,  /* 默认弃牌，损失最小 */
-
-};
-
-
 obj_queue g_round_queue;
 
 void QueueInit(obj_queue * pQueue)
@@ -283,7 +275,7 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
     WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
     if (WinRation > 50)
     {
-        return ACTION_raise;
+        return ACTION_check;
     }
     return ACTION_check;
 }
@@ -319,17 +311,49 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
     WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
 
-    if ((WinRation >= 30) && STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards))
+    bool IsMaxInMyHand = STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards);
+    printf("Total pot on ground:%d win:%d ismax:%d;\r\n",
+           pRound->Inquires[pRound->InquireCount-1].TotalPot,
+           WinRation, IsMaxInMyHand);
+    if (IsMaxInMyHand)
     {
-//        printf("Round %d allin:%d; \r\n", pRound->RoundIndex, WinRation,
-//               Msg_GetCardTypeName(Type),
-//               GetCardPointName(MaxPoint[Type]));
-        return ACTION_allin;
+        if (WinRation <= 30)
+        {
+    //        printf("Round %d allin:%d; \r\n", pRound->RoundIndex, WinRation,
+    //               Msg_GetCardTypeName(Type),
+    //               GetCardPointName(MaxPoint[Type]));
+            //pRound-> 记录raise的次数和总金额，如果超过比例，就不再raise，而是check或者fold
+            if (pRound->Inquires[pRound->InquireCount-1].TotalPot > 1000)
+            {
+                return ACTION_fold;
+            }
+            else
+            {
+                return ACTION_check;
+            }
+        }
+        else if (WinRation <= 50)
+        {
+            if (pRound->RaiseTimes ++ < 2)
+            {
+                return ACTION_raise;    /* 只riase到指定比例 */
+            }
+            return ACTION_check;
+        }
+        else if (WinRation <= 70)
+        {
+            if (pRound->RaiseTimes ++ < 3)
+            {
+                return ACTION_raise;    /* 只riase到指定比例 */
+            }
+            return ACTION_check;
+        }
+        else
+        {
+            return ACTION_allin;    /*  */
+        }
     }
-    else
-    {
-        return ACTION_check;
-    }
+    return ACTION_fold;
 }
 
 /* 只会在inquire中读取处理动作 */
@@ -338,6 +362,8 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
     const char * pAction = NULL;
     PLAYER_Action  Action = ACTION_fold;
     Action = ACTION_check;
+
+    //printf("Get action:%d;\r\n", pRound->RoundStatus);
 
     switch (pRound->RoundStatus)
     {
@@ -355,7 +381,7 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
         //Action = ACTION_check;
         //Action = STG_GetTurnAction(pRound);
         break;
-    case SER_MSG_TYPE_river:/* 只有两张手牌时的inqurie */
+    case SER_MSG_TYPE_river:
         Action = STG_GetRiverAction(pRound);
         break;
     }
@@ -363,7 +389,7 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
     pAction = GetActionName(Action);
     if (Action == ACTION_raise)
     {
-        return sprintf(ActionBuf, "%s %d", pAction, pRound->RaiseJetton);
+        return sprintf(ActionBuf, "%s %d", pAction, 1);
     }
     else
     {

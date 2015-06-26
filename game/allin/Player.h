@@ -180,11 +180,13 @@ typedef struct CARD_
 /* 玩家的处理策略 */
 typedef enum PLAYER_Action_
 {
+    ACTION_NONE,
     ACTION_fold,
     ACTION_check,       /* 让牌，即在前面的玩家，什么也不做，把机会给后面的玩家 */
     ACTION_call,        /* 跟进，即前面有人raise，即不re-raise，也不弃牌，则call， */
     ACTION_raise,
     ACTION_allin,
+    ACTION_BUTTON,
     //
 } PLAYER_Action;
 
@@ -197,19 +199,6 @@ typedef enum PLAYER_SEAT_TYPES_
     PLAYER_SEAT_TYPES_big_blind,
 } PLAYER_SEAT_TYPES;
 
-/* 玩家信息 */
-typedef struct PLAYER_
-{
-    /* 静态属性 */
-    char PlayerID[32];
-    char PlayerName[32];    /* player name, length of not more than 20 bytes */
-
-    /* 动态player 信息 */
-    int Status;             /* 当前局的当前状态 */
-    int SeatIndex;          /* 当前局的位置 */
-    CARD HoldCards[2];      /* 选手的两张底牌，不确定的 */
-
-} PLAYER;
 
 typedef struct MSG_READ_INFO_
 {
@@ -293,11 +282,13 @@ typedef struct MSG_INQUIRE_INFO_
 /* 每一局信息 */
 typedef struct RoundInfo_
 {
+    int RoundIndex;
     SER_MSG_TYPES CurrentMsgType;
     SER_MSG_TYPES RoundStatus;                /* 当前局状态 */
-    int RoundIndex;
+
+    int RaiseTimes;
     int InquireCount;
-    int RaiseJetton;            /* 策略是要加注时的大小 */
+//   int RaiseJetton;            /* 策略是要加注时的大小 */
     MSG_SEAT_INFO SeatInfo;
     MSG_CARD_INFO PublicCards;
     MSG_CARD_INFO HoldCards;
@@ -346,7 +337,7 @@ void Debug_PrintChardInfo(CARD * pCard, int CardNum);
 
 void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown);
 
-/****************************************************************************************/
+/*****************************stg 函数***********************************************************/
 
 /* 每一局开始前，保存数据 */
 void STG_SaveRoundData(RoundInfo * pRoundInfo);
@@ -360,6 +351,13 @@ void STG_Dispose(void);
 const char * STG_GetAction(RoundInfo * pRound);
 
 const char * GetActionName(PLAYER_Action act);
+
+/****************************************************************************************/
+
+
+/*****************************player 函数***********************************************/
+
+
 
 /****************************************************************************************/
 

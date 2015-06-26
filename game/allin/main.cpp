@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
 
     /* Ïòserver×¢²á */
     char reg_msg[50]="";
-    snprintf(reg_msg, sizeof(reg_msg) - 1, "reg: %d %s \n", my_id, my_name);
+    snprintf(reg_msg, sizeof(reg_msg) - 1, "reg: %d %s need_notify \n", my_id, my_name);
     send(m_socket_id, reg_msg, (int)strlen(reg_msg)+1, 0);
 
     //TRACE("%d\r\n", g_msg_queue.exit);

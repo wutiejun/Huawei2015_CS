@@ -32,24 +32,24 @@ export "PLAYER6_IP"=127.0.0.6
 export "PLAYER6_PORT"=6006
 export "PLAYER6_ID"=1006
 
-# user 6
+# user 7
 export "PLAYER7_IP"=127.0.0.7
 export "PLAYER7_PORT"=6007
 export "PLAYER7_ID"=1007
 
-# user 7
+# user 8
 export "PLAYER8_IP"=127.0.0.8
 export "PLAYER8_PORT"=6008
 export "PLAYER8_ID"=1008
 
 # Start Server
-../gameserver -gip $ser_ip -seq replay -r $reg -d $delay -m $money -b $blind -t $jetton -h $hand 0</dev/null 1>/dev/null 2>/dev/null &
+./gameserver -gip $ser_ip -seq replay -r $reg -d $delay -m $money -b $blind -t $jetton -h $hand 0</dev/null 1>/dev/null 2>/dev/null &
 
 # Start all users
 ./game 127.0.0.1 6000 127.0.0.1 6001 1001  $1 &
 
 #./game 127.0.0.1 6000 127.0.0.2 6002 1002 &
-./check 127.0.0.1 6000 127.0.0.2 6002 1002 &
+./check 127.0.0.1 6000 127.0.0.2 6002 1002 fold &
 
 ./check 127.0.0.1 6000 127.0.0.3 6003 1003 &
 
