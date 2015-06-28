@@ -46,10 +46,10 @@ export "PLAYER8_ID"=1008
 ./gameserver -gip $ser_ip -seq replay -r $reg -d $delay -m $money -b $blind -t $jetton -h $hand 0</dev/null 1>/dev/null 2>/dev/null &
 
 # Start all users
-./game 127.0.0.1 6000 127.0.0.1 6001 1001  $1 &
+./game 127.0.0.1 6000 127.0.0.1 6001 1001 &
 
 #./game 127.0.0.1 6000 127.0.0.2 6002 1002 &
-./check 127.0.0.1 6000 127.0.0.2 6002 1002 fold &
+./check 127.0.0.1 6000 127.0.0.2 6002 1002 &
 
 ./check 127.0.0.1 6000 127.0.0.3 6003 1003 &
 

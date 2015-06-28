@@ -172,7 +172,11 @@ typedef enum PLAYER_Action_
     ACTION_fold,
     ACTION_check,       /* 让牌，即在前面的玩家，什么也不做，把机会给后面的玩家 */
     ACTION_call,        /* 跟进，即前面有人raise，即不re-raise，也不弃牌，则call， */
-    ACTION_raise,
+    ACTION_raise,       /* 加1倍注 */
+//    ACTION_raise_5,     /* 加2-5倍注 */
+//    ACTION_raise_10,    /* 加6-10倍注 */
+//    ACTION_raise_20,    /* 加11-20倍注 */
+//    ACTION_raise_much,  /* 加的更多 */
     ACTION_allin,
     ACTION_BUTTON,
     //
@@ -201,8 +205,8 @@ typedef struct PLAYER_SEAT_INFO_
 {
     unsigned int PlayerID;
     PLAYER_SEAT_TYPES Type;
-    unsigned int Jetton;
-    unsigned int Money;
+    int Jetton;
+    int Money;
 } PLAYER_SEAT_INFO;
 
 /* 每一局中的玩家座位 */
@@ -222,18 +226,18 @@ typedef struct MSG_CARD_INFO_
 typedef struct PLAYER_JETTION_INFO_
 {
     unsigned int PlayerID;
-    unsigned int Jetton;
+    int Jetton;
 } PLAYER_JETTION_INFO;
 
 typedef struct MSG_BLIND_INFO_
 {
-    unsigned int BlindNum;
+    int BlindNum;
     PLAYER_JETTION_INFO BlindPlayers[2];    /* 只有大小盲注 */
 } MSG_BLIND_INFO;
 
 typedef struct MSG_POT_WIN_INFO_
 {
-    unsigned int PotWinCount;
+    int PotWinCount;
     PLAYER_JETTION_INFO PotWin[2];  /* 存在多个人平均奖金的情况，一般两个人，多的情况不统计了，关系不大 */
 } MSG_POT_WIN_INFO;
 
@@ -259,9 +263,9 @@ typedef struct MSG_SHOWDWON_INFO_
 typedef struct MSG_INQUIRE_PLAYER_ACTION_
 {
     unsigned int PlayerID;
-    unsigned int Jetton;     /* 筹码数 */
-    unsigned int Money;      /* 金币数 */
-    unsigned int Bet;        /* 本局下注数 */
+    int Jetton;     /* 筹码数 */
+    int Money;      /* 金币数 */
+    int Bet;        /* 本局下注数 */
     PLAYER_Action Action;   /* 当前动作 */
 } MSG_INQUIRE_PLAYER_ACTION;
 
@@ -292,7 +296,6 @@ typedef struct RoundInfo_
     /* 不需要notify消息，在inquire中已经全部有了 */
 } RoundInfo;
 
-
 typedef void (* MSG_LineReader)(char Buffer[256], RoundInfo * pArg);
 typedef void (* STG_Action)(RoundInfo * pArg);
 
@@ -306,6 +309,24 @@ typedef struct MSG_NAME_TYPE_ENTRY_
     MSG_LineReader LinerReader;
     STG_Action Action;
 } MSG_NAME_TYPE_ENTRY;
+
+/* 选手模型 */
+typedef struct PLAYER_
+{
+    unsigned int PlayerID;
+    int PlayerLevel;        /* 选手个性级别, 1-9级，1激进，9保守 */
+
+    int RoundIndex;         /* 局数 */
+
+    /* hold时的行为 */
+
+    /* flop时的行为 */
+
+    /* turn时的行为 */
+
+    /* river时的行为 */
+
+} PLAYER;
 
 /****************************************************************************************/
 

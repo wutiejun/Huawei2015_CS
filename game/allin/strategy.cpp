@@ -89,19 +89,6 @@ typedef struct STG_WIN_CARDS_
     //CARD_POINT SedPoint;    /* 赢牌的次大点数，这个是否需要考虑？可以不考虑，如果是两对的情况，次大牌可以再通过一对的情况来判断 */
 } STG_WIN_CARDS;
 
-/* 牌型(手牌)发展概率 */
-typedef struct STG_POINT_DEVELOP_
-{
-
-
-} STG_POINT_DEVELOP;
-
-/* 花色发展情况 */
-typedef struct STG_COLOR_DEVELOP_
-{
-
-} STG_COLOR_DEVELOP;
-
 typedef struct STG_DATA_
 {
     int RunningFlag;
@@ -370,6 +357,258 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     return ACTION_fold;
 }
 
+#define INIT_TWOCARD_NUM 40
+#define INIT_TWOCARD_NUM_EXTEND 38
+
+typedef struct
+{
+	int cardinfo;  //两张牌，如AA表示成1414，KK表示成13130,个位表示花色 0：不同花色，1：同花色
+	int No_Pet;    //在你之前无人加注
+	int With_Pet;  //在你之前有人加注
+}INIT_TWOCARD_INFO_EXTEND;
+
+
+typedef enum
+{
+	TWOCARD_INFO_R, // 无论你前面玩家如何下注，你都要加注
+	TWOCARD_INFO_C, //无论有多少个玩家进入游戏，你都要跟注
+	TWOCARD_INFO_C_RFI_LP, //无论有多少个玩家进入游戏，你都要跟注 处于后位 加注
+	TWOCARD_INFO_C1, //在你之前至少有一个玩家跟注，你才可以跟注，否则弃牌
+	TWOCARD_INFO_C2, //在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌
+	TWOCARD_INFO_C2_RFI_LP, //在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌 处于后位加注
+	TWOCARD_INFO_C3, //在你之前如果有三个或三个以上的玩家进入游戏，你才可以跟注，否则弃牌
+	TWOCARD_INFO_C3_RFI_LP, //在你之前如果有三个或三个以上的玩家进入游戏，你才可以跟注，否则弃牌 处于后位加注
+	TWOCARD_INFO_C4, //在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌
+	TWOCARD_INFO_RR, // 你应该再加注
+	TWOCARD_INFO_F, // 你应该弃牌
+
+	TWOCARD_INFO_BUTT
+}TWOCARD_INFO_BEHAIVOR;
+
+INIT_TWOCARD_INFO_EXTEND Init_TwoCard_Info_Extend[INIT_TWOCARD_NUM_EXTEND] =
+{
+    {14140,TWOCARD_INFO_R,TWOCARD_INFO_RR},
+    {13130,TWOCARD_INFO_R,TWOCARD_INFO_RR},
+    {12120,TWOCARD_INFO_R,TWOCARD_INFO_RR},
+    {14131,TWOCARD_INFO_R,TWOCARD_INFO_RR},
+    {11110,TWOCARD_INFO_R,TWOCARD_INFO_C},
+    {10100,TWOCARD_INFO_R,TWOCARD_INFO_C},
+    {14130,TWOCARD_INFO_R,TWOCARD_INFO_C},
+    {14121,TWOCARD_INFO_R,TWOCARD_INFO_C},
+    {9090, TWOCARD_INFO_C,TWOCARD_INFO_C2},
+    {14120,TWOCARD_INFO_C,TWOCARD_INFO_C2},
+    {14111,TWOCARD_INFO_C,TWOCARD_INFO_C2},
+    {13121,TWOCARD_INFO_C,TWOCARD_INFO_C2},
+    {13120,TWOCARD_INFO_C,TWOCARD_INFO_F},
+    {8080, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {7070, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {6060, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {5050, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {4040, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {3030, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {2020, TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14021,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14031,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14041,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14051,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14061,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14071,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14081,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14091,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {14101,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {13111,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {13101,TWOCARD_INFO_C3,TWOCARD_INFO_F},
+    {12111,TWOCARD_INFO_C2,TWOCARD_INFO_C4},
+    {12101,TWOCARD_INFO_C3,TWOCARD_INFO_F},
+    {11101,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {10091,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {9081,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {8071,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+    {7061,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
+};
+
+
+MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound);
+
+//获取首轮在我之前有多少存活玩家数
+int ST_GetAlivePlayerNum(RoundInfo *pRound)
+{
+    int cnt = 0;
+    MSG_INQUIRE_INFO *pInquireInfo = Msg_GetCurrentInquireInfo(pRound);
+
+	for(unsigned int i = 0; i < pInquireInfo->PlayerNum; i++)
+	{
+		if (pInquireInfo->PlayerActions[i].Action != ACTION_fold)
+		{
+			cnt++;
+		}
+	}
+
+	return cnt;
+}
+//获取首轮在我之前有多少加注玩家数
+int ST_GetAlivePetPlayerNum(RoundInfo *pRound)
+{
+    int cnt = 0;
+    MSG_INQUIRE_INFO *pInquireInfo = Msg_GetCurrentInquireInfo(pRound);
+
+	for(unsigned int i = 0; i < pInquireInfo->PlayerNum; i++)
+	{
+		if (pInquireInfo->PlayerActions[i].Action == ACTION_raise)
+		{
+			cnt++;
+		}
+	}
+
+	return cnt;
+}
+
+/*当前存活的玩家数小于等于3，且是2张牌时的策略 */
+/************************************************************************/
+/* 功能：初始牌通过预知条件判断                                        */
+/* 输入：初始牌                                                       */
+/* 输出：                                                           */
+/* 输出：每局开始时调用                                                 */
+/************************************************************************/
+PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
+{
+	unsigned int i;
+	int cardinfo;
+	int Max,Min;
+	CARD CardInfo[2];
+	int type = 0;
+	int alive_num;
+	int alive_pet_num;
+	int No_Pet_Action = TWOCARD_INFO_BUTT;    //在之前无人加注
+	int With_Pet_Action = TWOCARD_INFO_BUTT;  //在之前有人加注
+
+    /* 取得两张手牌 */
+	memcpy(pRound->HoldCards.Cards, CardInfo, sizeof(CardInfo));
+
+	if (CardInfo[0].Point > CardInfo[1].Point)
+	{
+		Max = CardInfo[0].Point;
+		Min = CardInfo[1].Point;
+	}
+	else
+	{
+		Max = CardInfo[1].Point;
+		Min = CardInfo[0].Point;
+	}
+	if (CardInfo[0].Color == CardInfo[1].Color)
+	{
+		type = 1;
+	}
+	cardinfo = Max*1000 + Min*10 + type;
+
+	for (i = 0;i<INIT_TWOCARD_NUM_EXTEND;i++)
+	{
+		if (Init_TwoCard_Info_Extend[i].cardinfo == cardinfo)
+		{
+			No_Pet_Action = Init_TwoCard_Info_Extend[i].No_Pet;
+			With_Pet_Action = Init_TwoCard_Info_Extend[i].With_Pet;
+			break;
+		}
+	}
+
+	alive_num = ST_GetAlivePlayerNum(pRound);
+	alive_pet_num = ST_GetAlivePetPlayerNum(pRound);
+
+	if (alive_pet_num == 0)
+	{
+		/*无论你前面玩家如何下注，你都要加注*/
+		if (No_Pet_Action == TWOCARD_INFO_R)
+		{
+			return ACTION_raise;
+		}
+		/*无论有多少个玩家进入游戏，你都要跟注*/
+		else if(No_Pet_Action == TWOCARD_INFO_C)
+		{
+			return ACTION_call;
+		}
+		/*在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		else if(No_Pet_Action == TWOCARD_INFO_C2)
+		{
+			if (alive_num > 1)
+			{
+				return ACTION_call;
+			}
+			else
+			{
+				return ACTION_fold;
+			}
+		}
+		/*在你之前如果有三个或三个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		else if(No_Pet_Action == TWOCARD_INFO_C3)
+		{
+			if (alive_num > 2)
+			{
+				return ACTION_call;
+			}
+			else
+			{
+				return ACTION_fold;
+			}
+		}
+		/*在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		else if(No_Pet_Action == TWOCARD_INFO_C4)
+		{
+			if (alive_num > 3)
+			{
+				return ACTION_call;
+			}
+			else
+			{
+				return ACTION_fold;
+			}
+		}
+	}
+	else
+	{
+		/*你应该再加注*/
+		if (With_Pet_Action == TWOCARD_INFO_RR)
+		{
+			return ACTION_raise;
+		}
+		/*无论有多少个玩家进入游戏，你都要跟注*/
+		else if(With_Pet_Action == TWOCARD_INFO_C)
+		{
+			return ACTION_call;
+		}
+		/*在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		else if(With_Pet_Action == TWOCARD_INFO_C2)
+		{
+			if (alive_num > 1)
+			{
+				return ACTION_call;
+			}
+			else
+			{
+				return ACTION_fold;
+			}
+		}
+		/*在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		else if(With_Pet_Action == TWOCARD_INFO_C4)
+		{
+			if (alive_num > 3)
+			{
+				return ACTION_call;
+			}
+			else
+			{
+				return ACTION_fold;
+			}
+		}
+		/*你应该弃牌*/
+		else if(With_Pet_Action == TWOCARD_INFO_F)
+		{
+			return ACTION_fold;
+		}
+	}
+
+	return ACTION_BUTTON;
+}
+
 /* 只会在inquire中读取处理动作 */
 int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
 {
@@ -385,7 +624,11 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
          break;
     case SER_MSG_TYPE_hold_cards_inquire:/* 只有两张手牌时的inqurie */
         //Action = ACTION_check;
-        Action = STG_GetHoldAction(pRound);
+        Action = Get_Init_Two_Card_Action_Extend(pRound);
+        if (Action == ACTION_BUTTON)
+        {
+            Action = ACTION_fold;
+        }
         break;
     case SER_MSG_TYPE_flop_inquire:     /* 三张公牌后的inqurie */
         //Action = ACTION_check;
@@ -688,6 +931,7 @@ void STG_AnalyseWinCard_AllCards(CARD AllCards[7], int WinIndex, int PlayerNum)
 //           PlayerNum,
 //           Msg_GetCardTypeName(CardType),
 //          (int)MaxPoints[CardType], WinIndex);
+    return;
 }
 
 /* 分析各选手的牌与公牌的组合，然后记录赢牌和出现牌的次数 */
@@ -715,6 +959,13 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
     }
 }
 
+/* 动态分析对手行为 */
+void STG_AnalysePlayer(RoundInfo *pRound)
+{
+    /*  */
+
+    return;
+}
 
 /* 分析牌型和对手情况 */
 void * STG_ProcessThread(void *pArgs)
@@ -738,13 +989,15 @@ void * STG_ProcessThread(void *pArgs)
 
         pRound = (RoundInfo *)pQueueEntry->pObjData;
 
-        Debug_ShowRoundInfo(pRound);
+        //Debug_ShowRoundInfo(pRound);
 
-//        printf("Get round %d data to anylize. public card num %d;\r\n",
-//               pRound->RoundIndex, pRound->PublicCards.CardNum);
-
+        /* 分析赢牌数据 */
         STG_AnalyseWinCard(pRound);
 
+        /* 分析对手行为 */
+        STG_AnalysePlayer(pRound);
+
+        /* 释放一局的内存 */
         free(pQueueEntry);
         pQueueEntry = NULL;
         pRound = NULL;

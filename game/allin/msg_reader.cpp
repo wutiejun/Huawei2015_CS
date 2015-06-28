@@ -676,10 +676,6 @@ void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 
 void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
 {
-
-//    printf("[%d]Add round %d data. public card num %d;\r\n",
-//       __LINE__, pRound->RoundIndex, pRound->PublicCards.CardNum);
-
     pRound->RoundStatus = SER_MSG_TYPE_showdown;
 
     /* 先读取5张公牌 */

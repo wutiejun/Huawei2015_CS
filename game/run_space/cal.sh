@@ -98,11 +98,14 @@ function CalPlayerWinRation()
 	printf "Total: %5d\r\n" $all_win;
 }
 
-CalTypeWinRation
+#CalTypeWinRation
 
-CalCardShowAndWinRation
+#CalCardShowAndWinRation
 
-CalPlayerWinRation
+#CalPlayerWinRation
 
 #CalTypeDevRation
+
+# 看最后谁的金币最多
+cat ./log.txt | grep " blind: " | tail
 
