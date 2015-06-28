@@ -212,7 +212,7 @@ void STG_SaveRoundData(RoundInfo * pRound)
 /* 查询全局数据库，取得指定牌型和最大点数的胜率  */
 int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint, int PlayerNum)
 {
-    printf("STG_CheckWinRation:%d %d %d;\r\n", PlayerNum, (int)Type, (int)MaxPoint);
+    //printf("STG_CheckWinRation:%d %d %d;\r\n", PlayerNum, (int)Type, (int)MaxPoint);
     int WinNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].WinTimes;
     int ShowNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].ShowTimes;
 
@@ -261,6 +261,13 @@ bool STG_IsHoldSameColor(RoundInfo * pRound)
     return pRound->HoldCards.Cards[0].Color == pRound->HoldCards.Cards[1].Color;
 }
 
+/* 取得本局还在场的完家 */
+int STG_GetActivePlayer(RoundInfo * pRound)
+{
+    //pRound->Inquires.PlayerActions
+
+}
+
 /* 处理手牌阶段的inquire */
 PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
 {
@@ -271,12 +278,19 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
     AllCards[0] = pRound->HoldCards.Cards[0];
     AllCards[1] = pRound->HoldCards.Cards[1];
 
+    /* 先取两张牌型的胜率情况 */
     Type = STG_GetCardTypes(AllCards, 2, MaxPoint);
     WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
     if (WinRation > 50)
     {
-        return ACTION_check;
+        return ACTION_raise;
     }
+
+    /* 再分析当前对手情况 */
+
+
+    /*  */
+
     return ACTION_check;
 }
 
@@ -312,9 +326,9 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     WinRation = STG_CheckWinRation(Type, MaxPoint[Type], pRound->SeatInfo.PlayerNum);
 
     bool IsMaxInMyHand = STG_IsMaxPointInHand(MaxPoint[Type], pRound->HoldCards.Cards);
-    printf("Total pot on ground:%d win:%d ismax:%d;\r\n",
-           pRound->Inquires[pRound->InquireCount-1].TotalPot,
-           WinRation, IsMaxInMyHand);
+//    printf("Total pot on ground:%d win:%d ismax:%d;\r\n",
+//           pRound->Inquires[3].TotalPot,
+//           WinRation, IsMaxInMyHand);
     if (IsMaxInMyHand)
     {
         if (WinRation <= 30)
@@ -323,7 +337,7 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
     //               Msg_GetCardTypeName(Type),
     //               GetCardPointName(MaxPoint[Type]));
             //pRound-> 记录raise的次数和总金额，如果超过比例，就不再raise，而是check或者fold
-            if (pRound->Inquires[pRound->InquireCount-1].TotalPot > 1000)
+            if (pRound->Inquires[3].TotalPot > 1000)
             {
                 return ACTION_fold;
             }
@@ -369,19 +383,19 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
     {
     default:
          break;
-    case SER_MSG_TYPE_hold_cards:/* 只有两张手牌时的inqurie */
+    case SER_MSG_TYPE_hold_cards_inquire:/* 只有两张手牌时的inqurie */
         //Action = ACTION_check;
         Action = STG_GetHoldAction(pRound);
         break;
-    case SER_MSG_TYPE_flop:     /* 三张公牌后的inqurie */
+    case SER_MSG_TYPE_flop_inquire:     /* 三张公牌后的inqurie */
         //Action = ACTION_check;
         //Action = STG_GetFlopAction(pRound);
         break;
-    case SER_MSG_TYPE_turn:     /* 四张公牌后的inqurie */
+    case SER_MSG_TYPE_turn_inquire:     /* 四张公牌后的inqurie */
         //Action = ACTION_check;
         //Action = STG_GetTurnAction(pRound);
         break;
-    case SER_MSG_TYPE_river:
+    case SER_MSG_TYPE_river_inquire:
         Action = STG_GetRiverAction(pRound);
         break;
     }
@@ -404,6 +418,7 @@ void STG_Inquire_Action(RoundInfo * pRound)
     //const char* response = "check";
     char ActionBufer[128] = {0};
     int ResNum = STG_GetAction(pRound, ActionBufer);
+    TRACE("Get Action:%s.\r\n", ActionBufer);
     ResponseAction(ActionBufer, ResNum);
     return;
 }

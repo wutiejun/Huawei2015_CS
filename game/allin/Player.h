@@ -112,32 +112,20 @@ typedef enum SER_MSG_TYPES_
     SER_MSG_TYPE_seat_info,
     SER_MSG_TYPE_blind,
     SER_MSG_TYPE_hold_cards,
-    SER_MSG_TYPE_inquire,
+    SER_MSG_TYPE_hold_cards_inquire,
     //
     SER_MSG_TYPE_flop,
+    SER_MSG_TYPE_flop_inquire,
     SER_MSG_TYPE_turn,
+    SER_MSG_TYPE_turn_inquire,
     SER_MSG_TYPE_river,
+    SER_MSG_TYPE_river_inquire,
     SER_MSG_TYPE_showdown,
     SER_MSG_TYPE_pot_win,
     SER_MSG_TYPE_notify,
     SER_MSG_TYPE_game_over,
     //
 } SER_MSG_TYPES;
-
-/* 抽象消息结构 */
-typedef struct GAME_MSG_
-{
-    SER_MSG_TYPES Type;
-    char MsgRawData[1024];      /* 从日志中暂时没看到大于1024的消息 */
-} GAME_MSG;
-
-typedef struct GAME_MSG_reg_
-{
-    const char * MsgName;
-    //
-    int PlayerID;
-    char PlayerName[32];
-} GAME_MSG_reg;
 
 /* 卡片颜色 */
 typedef enum CARD_COLOR_
@@ -199,7 +187,7 @@ typedef enum PLAYER_SEAT_TYPES_
     PLAYER_SEAT_TYPES_big_blind,
 } PLAYER_SEAT_TYPES;
 
-
+/* 消息读取时数据结构 */
 typedef struct MSG_READ_INFO_
 {
     const char * pMsg;
@@ -208,49 +196,57 @@ typedef struct MSG_READ_INFO_
     void * pData;
 } MSG_READ_INFO;
 
-
+/* 玩家座位信息 */
 typedef struct PLAYER_SEAT_INFO_
 {
-    char PlayerID[32];
+    unsigned int PlayerID;
     PLAYER_SEAT_TYPES Type;
     unsigned int Jetton;
     unsigned int Money;
 } PLAYER_SEAT_INFO;
 
+/* 每一局中的玩家座位 */
 typedef struct MSG_SEAT_INFO_
 {
     int PlayerNum;
     PLAYER_SEAT_INFO Players[8];
 } MSG_SEAT_INFO;
 
+/* 每一局的公开牌信息 */
 typedef struct MSG_CARD_INFO_
 {
     int CardNum;
     CARD Cards[5];    /* 前3张公牌，第4张转牌，第5张河牌，如果是手牌，就只有两张 */
 } MSG_CARD_INFO;
 
-typedef struct MSG_POT_WIN_INFO_
+typedef struct PLAYER_JETTION_INFO_
 {
-    char PlayerID[32];
+    unsigned int PlayerID;
     unsigned int Jetton;
-} MSG_POT_WIN_INFO;
-
-typedef struct MSG_POT_WIN_INFO_ MSG_PLAYER_BLIND_INFO;
+} PLAYER_JETTION_INFO;
 
 typedef struct MSG_BLIND_INFO_
 {
-    int BlindNum;
-    MSG_PLAYER_BLIND_INFO BlindPlayers[2];    /* 只有大小盲注 */
+    unsigned int BlindNum;
+    PLAYER_JETTION_INFO BlindPlayers[2];    /* 只有大小盲注 */
 } MSG_BLIND_INFO;
+
+typedef struct MSG_POT_WIN_INFO_
+{
+    unsigned int PotWinCount;
+    PLAYER_JETTION_INFO PotWin[2];  /* 存在多个人平均奖金的情况，一般两个人，多的情况不统计了，关系不大 */
+} MSG_POT_WIN_INFO;
 
 typedef struct MSG_SHOWDWON_PLAYER_CARD_
 {
     int Index;          /* 选手名次 */
-    char PlayerID[32];
+    unsigned int PlayerID;
+    //char PlayerID[32];
     CARD HoldCards[2];
     char CardType[32];
 } MSG_SHOWDWON_PLAYER_CARD;
 
+/* 不一定每局都有show消息 */
 typedef struct MSG_SHOWDWON_INFO_
 {
     int CardNum;
@@ -259,25 +255,23 @@ typedef struct MSG_SHOWDWON_INFO_
     MSG_SHOWDWON_PLAYER_CARD Players[8];    /* 选手的手牌 */
 } MSG_SHOWDWON_INFO;
 
+/* 查询玩家的inquire消息 */
 typedef struct MSG_INQUIRE_PLAYER_ACTION_
 {
-    char PlayerID[32];
-    int Jetton;
-    int Money;
-    int Bet;
-    //char ActionName[32];
-    PLAYER_Action Action;
+    unsigned int PlayerID;
+    unsigned int Jetton;     /* 筹码数 */
+    unsigned int Money;      /* 金币数 */
+    unsigned int Bet;        /* 本局下注数 */
+    PLAYER_Action Action;   /* 当前动作 */
 } MSG_INQUIRE_PLAYER_ACTION;
 
 /* 询问玩家时，每次最多8个玩家，如果一次询问中，多于8个的，循环覆盖即可 */
 typedef struct MSG_INQUIRE_INFO_
 {
-    int PlayerNum;
-    int TotalPot;
+    int PlayerNum;  /* 读取inquire消息时的写入索引号 */
+    int TotalPot;   /* 本局总彩池数 */
     MSG_INQUIRE_PLAYER_ACTION PlayerActions[8];
 } MSG_INQUIRE_INFO;
-
-#define MAX_INQUIRE_COUNT 32
 
 /* 每一局信息 */
 typedef struct RoundInfo_
@@ -287,15 +281,14 @@ typedef struct RoundInfo_
     SER_MSG_TYPES RoundStatus;                /* 当前局状态 */
 
     int RaiseTimes;
-    int InquireCount;
-//   int RaiseJetton;            /* 策略是要加注时的大小 */
     MSG_SEAT_INFO SeatInfo;
     MSG_CARD_INFO PublicCards;
     MSG_CARD_INFO HoldCards;
     MSG_BLIND_INFO Blind;
     MSG_SHOWDWON_INFO ShowDown;
     MSG_POT_WIN_INFO PotWin;
-    MSG_INQUIRE_INFO Inquires[MAX_INQUIRE_COUNT];
+    //
+    MSG_INQUIRE_INFO Inquires[4];   /* 手牌、公牌、转牌、河牌分别4次查询 */
     /* 不需要notify消息，在inquire中已经全部有了 */
 } RoundInfo;
 
@@ -303,6 +296,7 @@ typedef struct RoundInfo_
 typedef void (* MSG_LineReader)(char Buffer[256], RoundInfo * pArg);
 typedef void (* STG_Action)(RoundInfo * pArg);
 
+/* 每个消息解析的结构 */
 typedef struct MSG_NAME_TYPE_ENTRY_
 {
     const char * pStartName;
@@ -354,10 +348,7 @@ const char * GetActionName(PLAYER_Action act);
 
 /****************************************************************************************/
 
-
 /*****************************player 函数***********************************************/
-
-
 
 /****************************************************************************************/
 

@@ -87,7 +87,7 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     /inquire eol
     ****************************************************************************/
     {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
+    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
 
     /****************************************************************************
     flop/ eol
@@ -100,6 +100,15 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     SER_MSG_TYPE_flop, Msg_LinerReader_Flop, NULL},
 
     /****************************************************************************
+    inquire/ eol
+    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
+    total pot: num eol
+    /inquire eol
+    ****************************************************************************/
+    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
+    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
+
+    /****************************************************************************
     turn/ eol
     color point eol
     /turn eol
@@ -108,12 +117,30 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     SER_MSG_TYPE_turn, Msg_LinerReader_Turn, NULL},
 
     /****************************************************************************
+    inquire/ eol
+    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
+    total pot: num eol
+    /inquire eol
+    ****************************************************************************/
+    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
+    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
+
+    /****************************************************************************
     river/ eol
     color point eol
     /river eol
     ****************************************************************************/
     {"river/ \n" , "/river \n", sizeof("river/ \n") - 1,
     SER_MSG_TYPE_river, Msg_LinerReader_River, NULL},
+
+    /****************************************************************************
+    inquire/ eol
+    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
+    total pot: num eol
+    /inquire eol
+    ****************************************************************************/
+    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
+    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
 
     /*****************************************************************************
     showdown/ eol
@@ -220,12 +247,12 @@ void Msg_SetOffset(MSG_READ_INFO * pInfo, int Index)
 void Msg_ReadSeatInfo_PlayerSeat(void * pObj, char LineBuffer[256])
 {
     #define BUTTON      "button: "
-    #define BUTTON_FMT  "button: %s %d %d"
+    #define BUTTON_FMT  "button: %d %d %d"
     #define SMALL       "small blind: "
-    #define SMALL_FMT   "small blind: %s %d %d"
+    #define SMALL_FMT   "small blind: %d %d %d"
     #define BIG         "big blind: "
-    #define BIG_FMT     "big blind: %s %d %d"
-    #define PLAYER_FMT  "%s %d %d"
+    #define BIG_FMT     "big blind: %d %d %d"
+    #define PLAYER_FMT  "%d %d %d"
     MSG_SEAT_INFO * pSetInfo = (MSG_SEAT_INFO *)pObj;
     const char * pFmt = NULL;
     PLAYER_SEAT_INFO * pPlayerSeat = NULL;
@@ -261,15 +288,16 @@ void Msg_ReadSeatInfo_PlayerSeat(void * pObj, char LineBuffer[256])
     pPlayerSeat->Type = PLAYER_SEAT_TYPES_none;
 
 SCAN_PLAYER:
-    readnum = sscanf(LineBuffer, pFmt, PlayerSeat.PlayerID, &PlayerSeat.Jetton, &PlayerSeat.Money);
+    readnum = sscanf(LineBuffer, pFmt, &PlayerSeat.PlayerID, &PlayerSeat.Jetton, &PlayerSeat.Money);
     if (readnum != 3)
     {
         TRACE("sscanf error [%s];\r\n", LineBuffer);
         return ;
     }
-    memcpy(pPlayerSeat->PlayerID, PlayerSeat.PlayerID, sizeof(PlayerSeat.PlayerID));
-    pPlayerSeat->Jetton = PlayerSeat.Jetton;
-    pPlayerSeat->Money = PlayerSeat.Money;
+    //memcpy(pPlayerSeat->PlayerID, PlayerSeat.PlayerID, sizeof(PlayerSeat.PlayerID));
+    //pPlayerSeat->Jetton = PlayerSeat.Jetton;
+    //pPlayerSeat->Money = PlayerSeat.Money;
+    *pPlayerSeat = PlayerSeat;
     pSetInfo->PlayerNum ++;
     return;
 }
@@ -379,42 +407,33 @@ void Msg_ReadCardsInfo_Card(void * pObj, char LineBuffer[256])
     return;
 }
 
-void Msg_ReadPlayJettonInfo(MSG_POT_WIN_INFO * pPotWinInfo, char LineBuffer[256])
+/* 读取Pot win或者blind消息，两个消息结构一样，可以用一个函数读取 */
+/* "pot-win/ \n1001: 250 \n/pot-win \n", */
+void Msg_ReadPlayJettonInfo(PLAYER_JETTION_INFO * pPlayerJetton, char LineBuffer[256])
 {
     int ReadNum = 0;
     int scan_num = 0;
-    char PID[32] = {0};
+    //char PID[32] = {0};
+    int PID =0;
     int Jetton = 0;
 
-    /* "pot-win/ \n1001: 250 \n/pot-win \n", */
-    scan_num = sscanf(LineBuffer, "%s %d", PID, &Jetton);
+    scan_num = sscanf(LineBuffer, "%d: %d", &PID, &Jetton);
     if (scan_num != 2)
     {
         TRACE("sscanf error [%s];\r\n", LineBuffer);
         return;
     }
-
-    memcpy(pPotWinInfo->PlayerID, PID, 32);
-    pPotWinInfo->Jetton = Jetton;
-
-    ReadNum = strlen(pPotWinInfo->PlayerID);
-    while (ReadNum >= 0)
-    {
-        if (pPotWinInfo->PlayerID[ReadNum] == ':')
-        {
-            pPotWinInfo->PlayerID[ReadNum] = '\0';
-            break;
-        }
-        ReadNum --;
-    }
-    //printf("%s[%d]\r\n", pPotWinInfo->PlayerID, pPotWinInfo->Jetton);
+    //memcpy(pPotWinInfo->PlayerID, PID, 32);
+    pPlayerJetton->PlayerID = PID;
+    pPlayerJetton->Jetton = Jetton;
+    //printf("Player %d %d.\r\n", PID, Jetton);
     return;
 }
 
 void Msg_ReadBlindInfo_Ex(char LineBuffer[256], MSG_BLIND_INFO * pBlindInfo)
 {
     Msg_ReadPlayJettonInfo(&pBlindInfo->BlindPlayers[pBlindInfo->BlindNum], LineBuffer);
-    pBlindInfo->BlindNum ++;
+    pBlindInfo->BlindNum = (pBlindInfo->BlindNum + 1) % 2;
     return;
 }
 
@@ -452,9 +471,9 @@ bool Msg_ReadPlayerCardInfo(MSG_SHOWDWON_PLAYER_CARD * pPlayerCard, char LineBuf
 
     //printf("%s", LineBuffer);
     /* "1: 1001 SPADES 10 DIAMONDS 10 FULL_HOUSE", */
-    scan_num = sscanf(LineBuffer, "%d: %s %s %s %s %s %s",
+    scan_num = sscanf(LineBuffer, "%d: %d %s %s %s %s %s",
                &index,
-               pPlayerCard->PlayerID,
+               &pPlayerCard->PlayerID,
                CardColor1,CardPoint1,
                CardColor2,CardPoint2,
                CardType);
@@ -482,29 +501,17 @@ PLAYER_Action GetAction(const char * ActionNAme)
     return ACTION_fold;
 }
 
-/*
-typedef enum PLAYER_Action_
-{
-    ACTION_NONE,
-    ACTION_fold,
-    ACTION_check,
-    ACTION_call,
-    ACTION_raise,
-    ACTION_allin,
-    ACTION_BUTTON,
-    //
-} PLAYER_Action;
-*/
 const char * GetActionName(PLAYER_Action act)
 {
     const char * Actions[ACTION_BUTTON] = {"fold", "check", "call", "raise", "all_in", "fold"};
     return Actions[act];
 }
 
+/* 一次inquire msg中最多8个玩家的信息 */
 void Msg_ReadInquireInfoEx(const char LineBuffer[256], MSG_INQUIRE_INFO * pInquire)
 {
     char Actions[32] = {0};
-    char PID[32] = {0};
+    unsigned int PID = 0;
     int Jetton = 0;
     int Money = 0;
     int Bet = 0;
@@ -512,14 +519,16 @@ void Msg_ReadInquireInfoEx(const char LineBuffer[256], MSG_INQUIRE_INFO * pInqui
     MSG_INQUIRE_PLAYER_ACTION * pPlayerAction = NULL;
 
     pPlayerAction = &pInquire->PlayerActions[pInquire->PlayerNum];
-    scan_num = sscanf(LineBuffer, "%s %d %d %d %s",
-                      PID, &Jetton, &Money, &Bet, Actions);
+    scan_num = sscanf(LineBuffer, "%d %d %d %d %s",
+                      &PID, &Jetton, &Money, &Bet, Actions);
     if (scan_num != 5)
     {
         TRACE("sscanf error [%s];\r\n", LineBuffer);
         return;
     }
-    memcpy(pPlayerAction->PlayerID, PID, 32),
+
+    //memcpy(pPlayerAction->PlayerID, PID, 32),
+    pPlayerAction->PlayerID = PID;
     pPlayerAction->Jetton = Jetton;
     pPlayerAction->Money = Money;
     pPlayerAction->Bet = Bet;
@@ -562,17 +571,35 @@ void Msg_LinerReader_Hold(char Buffer[256], RoundInfo * pRound)
     return;
 }
 
+MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound)
+{
+    switch (pRound->RoundStatus)
+    {
+    default:
+    case SER_MSG_TYPE_hold_cards_inquire:
+        return &pRound->Inquires[0];
+    case SER_MSG_TYPE_flop_inquire:
+        return &pRound->Inquires[1];
+    case SER_MSG_TYPE_turn_inquire:
+        return &pRound->Inquires[2];
+    case SER_MSG_TYPE_river_inquire:
+        return &pRound->Inquires[3];
+    }
+}
+
 void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
 {
+    MSG_INQUIRE_INFO * pInquireInfo = NULL;
+
+    pInquireInfo = Msg_GetCurrentInquireInfo(pRound);
     if (strstr(Buffer, "total pot") != NULL)
     {
         int Jetton = 0;
         sscanf(Buffer, "total pot:%d", &Jetton);
-        pRound->Inquires[pRound->InquireCount].TotalPot = Jetton;
-        pRound->InquireCount ++;
+        pInquireInfo->TotalPot = Jetton;
         return;
     }
-    Msg_ReadInquireInfoEx(Buffer, &pRound->Inquires[pRound->InquireCount]);
+    Msg_ReadInquireInfoEx(Buffer, pInquireInfo);
     return;
 }
 
@@ -649,7 +676,6 @@ void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 
 void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
 {
-    //TRACE("%s %d %d \r\n", Buffer, pRound->ShowDown.CardNum, pRound->ShowDown.PlayerNum);
 
 //    printf("[%d]Add round %d data. public card num %d;\r\n",
 //       __LINE__, pRound->RoundIndex, pRound->PublicCards.CardNum);
@@ -714,10 +740,12 @@ void Msg_LinerReader_GameOver(char Buffer[256], RoundInfo * pRound)
 void Msg_LinerReader_PotWin(char Buffer[256], RoundInfo * pRound)
 {
     static int RoundIndex = 0;
-
     /* 读取彩池信息 */
-    Msg_ReadPlayJettonInfo(&pRound->PotWin, Buffer);
-    printf("%s win %d;\r\n", pRound->PotWin.PlayerID, pRound->PotWin.Jetton);
+    Msg_ReadPlayJettonInfo(&pRound->PotWin.PotWin[pRound->PotWin.PotWinCount], Buffer);
+//    printf("Player %d win %d;\r\n",
+//           pRound->PotWin.PotWin[pRound->PotWin.PotWinCount].PlayerID,
+//           pRound->PotWin.PotWin[pRound->PotWin.PotWinCount].Jetton);
+    pRound->PotWin.PotWinCount = (pRound->PotWin.PotWinCount + 1) % 2;
     //
     return;
 }
@@ -736,11 +764,38 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
     while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
     {
         Type = Msg_GetMsgTypeByMsgName(Buffer);
+
+        /* 如果是查询消息，要根据前一次的状态来决定是什么阶段的查询 */
+        if (Type == SER_MSG_TYPE_hold_cards_inquire)
+        {
+            if (pRound->CurrentMsgType == SER_MSG_TYPE_hold_cards)
+            {
+                pRound->CurrentMsgType = SER_MSG_TYPE_hold_cards_inquire;
+            }
+            else if (pRound->CurrentMsgType == SER_MSG_TYPE_flop)
+            {
+                pRound->CurrentMsgType = SER_MSG_TYPE_flop_inquire;
+            }
+            else if (pRound->CurrentMsgType == SER_MSG_TYPE_turn)
+            {
+                pRound->CurrentMsgType = SER_MSG_TYPE_turn_inquire;
+            }
+            else
+            {
+                pRound->CurrentMsgType = SER_MSG_TYPE_river_inquire;
+            }
+        }
+        else
+        {
+            pRound->CurrentMsgType = Type;
+        }
+
+        //printf("Get message type:%d;\r\n", (int)pRound->CurrentMsgType);
+
         pMsgEntry = &AllMsgTypes[Type];
-        pRound->CurrentMsgType = Type;
         Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
         TRACE("[%d][%s]\r\n", ReadNum, Buffer);
-        if (Type == SER_MSG_TYPE_game_over)
+        if (pRound->CurrentMsgType == SER_MSG_TYPE_game_over)
         {
             pMsgEntry->Action(pRound);
             break;
@@ -790,7 +845,11 @@ void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
     for (index = 0; index < pSeatInfo ->PlayerNum; index ++)
     {
         pPlayer = &pSeatInfo->Players[index];
-        printf("%s ID:%s Jetton:%d Money:%d\n", Msg_GetPlayType(pPlayer), pPlayer->PlayerID, pPlayer->Jetton, pPlayer->Money);
+        printf("%s ID:%d Jetton:%d Money:%d\n",
+               Msg_GetPlayType(pPlayer),
+               pPlayer->PlayerID,
+               pPlayer->Jetton,
+               pPlayer->Money);
     }
     return;
 }
@@ -814,7 +873,7 @@ void Debug_PrintBlindInfo(MSG_BLIND_INFO * pBlind)
     printf("Blind Info:\r\n");
     for (index = 0; index < pBlind->BlindNum; index ++)
     {
-        printf("%s %d\r\n", pBlind->BlindPlayers[index].PlayerID,
+        printf("%d %d\r\n", pBlind->BlindPlayers[index].PlayerID,
                pBlind->BlindPlayers[index].Jetton);
     }
 }
@@ -835,7 +894,7 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
     {
         MSG_SHOWDWON_PLAYER_CARD * pPlayerCard = NULL;
         pPlayerCard = &pShowDown->Players[index];
-        TRACE("Player %s:%d %s %s %s %s %s\r\n",
+        TRACE("Player %d:%d %s %s %s %s %s\r\n",
                pPlayerCard->PlayerID,
                pPlayerCard->Index,
                GetCardColorName(&pPlayerCard->HoldCards[0]),

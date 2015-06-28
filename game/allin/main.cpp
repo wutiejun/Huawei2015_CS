@@ -215,6 +215,7 @@ int main(int argc, char* argv[])
         {
             //printf("[%s] %d\r\n", buffer, size);
             //MsgQueueAdd(buffer, size);
+            TRACE("%s", buffer);
             if(server_msg_process(size, buffer) != true)
             {
                 break;
