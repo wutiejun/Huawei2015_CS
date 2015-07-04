@@ -491,6 +491,10 @@ void Msg_ReadInquireInfoEx(const char LineBuffer[256], MSG_INQUIRE_INFO * pInqui
     int scan_num = 0;
     MSG_INQUIRE_PLAYER_ACTION * pPlayerAction = NULL;
 
+    DOT(pInquire->PlayerNum);    
+
+    printf("Msg_ReadInquireInfoEx:%s;\r\n", LineBuffer);
+    
     pPlayerAction = &pInquire->PlayerActions[pInquire->PlayerNum];
     scan_num = sscanf(LineBuffer, "%d %d %d %d %s",
                       &PID, &Jetton, &Money, &Bet, Actions);
@@ -506,7 +510,10 @@ void Msg_ReadInquireInfoEx(const char LineBuffer[256], MSG_INQUIRE_INFO * pInqui
     pPlayerAction->Money = Money;
     pPlayerAction->Bet = Bet;
     pPlayerAction->Action = GetAction(Actions);
-    pInquire->PlayerNum ++;
+
+    /* 最多只有8个，如果少于8个，则可能有同一ID的查询在里面，后面再分析处理 */
+    pInquire->PlayerNum = (pInquire->PlayerNum + 1) % 8;
+    DOT(pInquire->PlayerNum);
     return;
 }
 
@@ -640,6 +647,9 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
 {
     pRound->RoundStatus = SER_MSG_TYPE_showdown;
 
+    //printf("[%s:%d]%s;\r\n", __FILE__, __LINE__, Buffer);
+
+#if 0
     /* 先读取5张公牌 */
     if ((pRound->ShowDown.CardNum >= 1) && (pRound->ShowDown.CardNum < 5))
     {
@@ -651,10 +661,11 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
         }
         return;
     }
+#endif
 
     /* 读取每个人的手牌，个数不会超过seat时的个数 */
-    if (   (pRound->ShowDown.PlayerNum >= 1)
-        && (pRound->ShowDown.PlayerNum < pRound->SeatInfo.PlayerNum))
+    if (   (pRound->ShowDown.PlayerNum >= 1))
+    //    && (pRound->ShowDown.PlayerNum < pRound->SeatInfo.PlayerNum))
     {
         MSG_SHOWDWON_PLAYER_CARD *pPlayerCard = NULL;
         pPlayerCard = &pRound->ShowDown.Players[pRound->ShowDown.PlayerNum - 1];
@@ -662,6 +673,7 @@ void Msg_LinerReader_ShowDown(char Buffer[256], RoundInfo * pRound)
         {
             pRound->ShowDown.PlayerNum ++;
         }
+        Debug_PrintShowDown(&pRound->ShowDown);
         return;
     }
 
@@ -819,12 +831,12 @@ void Debug_PrintBlindInfo(MSG_BLIND_INFO * pBlind)
 void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
 {
     int index = 0;
-    TRACE("Public cards:\r\n");
+    printf("Debug_PrintShowDown[%d]:\r\n", pShowDown->PlayerNum);
     for (index = 0; index < pShowDown->CardNum - 1; index ++)
     {
         CARD * pCard = NULL;
         pCard = &pShowDown->PublicCards[index];
-        TRACE("%s %s\r\n",
+        printf("%s %s\r\n",
                GetCardColorName(pCard),
                GetCardPointName(pCard->Point));
     }
@@ -832,7 +844,7 @@ void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown)
     {
         MSG_SHOWDWON_PLAYER_CARD * pPlayerCard = NULL;
         pPlayerCard = &pShowDown->Players[index];
-        TRACE("Player %d:%d %s %s %s %s %s\r\n",
+        printf("Player %d:%d %s %s %s %s %s\r\n",
                pPlayerCard->PlayerID,
                pPlayerCard->Index,
                GetCardColorName(&pPlayerCard->HoldCards[0]),

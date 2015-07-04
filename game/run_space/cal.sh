@@ -98,11 +98,11 @@ function CalPlayerWinRation()
 	printf "Total: %5d\r\n" $all_win;
 }
 
-#CalTypeWinRation
+CalTypeWinRation
 
-#CalCardShowAndWinRation
+CalCardShowAndWinRation
 
-#CalPlayerWinRation
+CalPlayerWinRation
 
 #CalTypeDevRation
 
