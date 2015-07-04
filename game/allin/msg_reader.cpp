@@ -87,7 +87,7 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     /inquire eol
     ****************************************************************************/
     {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
+    SER_MSG_TYPE_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
 
     /****************************************************************************
     flop/ eol
@@ -100,15 +100,6 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     SER_MSG_TYPE_flop, Msg_LinerReader_Flop, NULL},
 
     /****************************************************************************
-    inquire/ eol
-    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
-    total pot: num eol
-    /inquire eol
-    ****************************************************************************/
-    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
-
-    /****************************************************************************
     turn/ eol
     color point eol
     /turn eol
@@ -117,30 +108,12 @@ MSG_NAME_TYPE_ENTRY AllMsgTypes[] =
     SER_MSG_TYPE_turn, Msg_LinerReader_Turn, NULL},
 
     /****************************************************************************
-    inquire/ eol
-    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
-    total pot: num eol
-    /inquire eol
-    ****************************************************************************/
-    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
-
-    /****************************************************************************
     river/ eol
     color point eol
     /river eol
     ****************************************************************************/
     {"river/ \n" , "/river \n", sizeof("river/ \n") - 1,
     SER_MSG_TYPE_river, Msg_LinerReader_River, NULL},
-
-    /****************************************************************************
-    inquire/ eol
-    (pid jetton money bet blind | check | call | raise | all_in | fold eol)1-8
-    total pot: num eol
-    /inquire eol
-    ****************************************************************************/
-    {"inquire/ \n" , "/inquire \n", sizeof("inquire/ \n") - 1,
-    SER_MSG_TYPE_hold_cards_inquire, Msg_LinerReader_Inquire, Msg_Inquire_Action},
 
     /*****************************************************************************
     showdown/ eol
@@ -491,7 +464,7 @@ bool Msg_ReadPlayerCardInfo(MSG_SHOWDWON_PLAYER_CARD * pPlayerCard, char LineBuf
     return true;
 }
 
-PLAYER_Action GetAction(const char * ActionNAme)
+PLAYER_Action_EN GetAction(const char * ActionNAme)
 {
     if (strcmp(ActionNAme, "call") == 0) return ACTION_call;
     if (strcmp(ActionNAme, "check") == 0) return ACTION_check;
@@ -501,7 +474,7 @@ PLAYER_Action GetAction(const char * ActionNAme)
     return ACTION_fold;
 }
 
-const char * GetActionName(PLAYER_Action act)
+const char * GetActionName(PLAYER_Action_EN act)
 {
     const char * Actions[ACTION_BUTTON] = {"fold", "check", "call", "raise", "all_in", "fold"};
     return Actions[act];
@@ -568,22 +541,24 @@ void Msg_LinerReader_Hold(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->HoldCards, Buffer);
     pRound->RoundStatus = SER_MSG_TYPE_hold_cards;
+//    Debug_PrintChardInfo(__FILE__, __LINE__, pRound->HoldCards.Cards, pRound->HoldCards.CardNum);
     return;
 }
 
 MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound)
 {
-    switch (pRound->RoundStatus)
+    DOT(pRound->PublicCards.CardNum);
+    switch (pRound->PublicCards.CardNum)
     {
-    default:
-    case SER_MSG_TYPE_hold_cards_inquire:
-        return &pRound->Inquires[0];
-    case SER_MSG_TYPE_flop_inquire:
-        return &pRound->Inquires[1];
-    case SER_MSG_TYPE_turn_inquire:
-        return &pRound->Inquires[2];
-    case SER_MSG_TYPE_river_inquire:
-        return &pRound->Inquires[3];
+        default:
+        case 0:
+            return &pRound->Inquires[0];
+        case 3:
+            return &pRound->Inquires[1];
+        case 4:
+            return &pRound->Inquires[2];
+        case 5:
+            return &pRound->Inquires[3];
     }
 }
 
@@ -600,6 +575,7 @@ void Msg_LinerReader_Inquire(char Buffer[256], RoundInfo * pRound)
         return;
     }
     Msg_ReadInquireInfoEx(Buffer, pInquireInfo);
+    //Debug_PrintChardInfo(__FILE__, __LINE__, pRound->HoldCards.Cards, pRound->HoldCards.CardNum);
     return;
 }
 
@@ -618,6 +594,7 @@ void Msg_LinerReader_Flop(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
     pRound->RoundStatus = SER_MSG_TYPE_flop;
+    //Debug_PrintChardInfo(__FILE__, __LINE__, pRound->HoldCards.Cards, pRound->HoldCards.CardNum);
     return;
 }
 
@@ -625,6 +602,7 @@ void Msg_LinerReader_Turn(char Buffer[256], RoundInfo * pRound)
 {
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
     pRound->RoundStatus = SER_MSG_TYPE_turn;
+    //Debug_PrintChardInfo(__FILE__, __LINE__, pRound->HoldCards.Cards, pRound->HoldCards.CardNum);
     return;
 }
 
@@ -650,26 +628,10 @@ const char *Msg_GetCardTypeName(CARD_TYPES Type)
 
 void Msg_LinerReader_River(char Buffer[256], RoundInfo * pRound)
 {
-    //CARD AllCards[7];
-    //CARD_POINT MaxPoint[CARD_TYPES_Butt];
-    //CARD_TYPES Type = CARD_TYPES_None;
     Msg_ReadCardsInfo_Card(&pRound->PublicCards, Buffer);
     pRound->RoundStatus = SER_MSG_TYPE_river;
-
-#if 0
-    AllCards[0] = pRound->PublicCards.Cards[0];
-    AllCards[1] = pRound->PublicCards.Cards[1];
-    AllCards[2] = pRound->PublicCards.Cards[2];
-    AllCards[3] = pRound->PublicCards.Cards[3];
-    AllCards[4] = pRound->PublicCards.Cards[4];
-    AllCards[5] = pRound->HoldCards.Cards[0];
-    AllCards[6] = pRound->HoldCards.Cards[1];
-#endif
-
-    //Type = STG_GetCardTypes(AllCards, 7, MaxPoint);
-    //Debug_PrintChardInfo(AllCards, 7);
-
-    //printf("Type %s, Max:%d\r\n", Msg_GetCardTypeName(Type), MaxPoint[Type]);
+    
+    //Debug_PrintChardInfo(__FILE__, __LINE__, pRound->HoldCards.Cards, pRound->HoldCards.CardNum);
 
     return;
 }
@@ -760,45 +722,23 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
     while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
     {
         Type = Msg_GetMsgTypeByMsgName(Buffer);
+        pRound->CurrentMsgType = Type;
 
-        /* 如果是查询消息，要根据前一次的状态来决定是什么阶段的查询 */
-        if (Type == SER_MSG_TYPE_hold_cards_inquire)
-        {
-            if (pRound->CurrentMsgType == SER_MSG_TYPE_hold_cards)
-            {
-                pRound->CurrentMsgType = SER_MSG_TYPE_hold_cards_inquire;
-            }
-            else if (pRound->CurrentMsgType == SER_MSG_TYPE_flop)
-            {
-                pRound->CurrentMsgType = SER_MSG_TYPE_flop_inquire;
-            }
-            else if (pRound->CurrentMsgType == SER_MSG_TYPE_turn)
-            {
-                pRound->CurrentMsgType = SER_MSG_TYPE_turn_inquire;
-            }
-            else
-            {
-                pRound->CurrentMsgType = SER_MSG_TYPE_river_inquire;
-            }
-        }
-        else
-        {
-            pRound->CurrentMsgType = Type;
-        }
-
-        //printf("Get message type:%d;\r\n", (int)pRound->CurrentMsgType);
+        //DOT(pRound->CurrentMsgType);
 
         pMsgEntry = &AllMsgTypes[Type];
+        
         Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
-        TRACE("[%d][%s]\r\n", ReadNum, Buffer);
+        //printf("[%d][%s]\r\n", ReadNum, Buffer);
         if (pRound->CurrentMsgType == SER_MSG_TYPE_game_over)
         {
             pMsgEntry->Action(pRound);
             break;
         }
+        
         while ((ReadNum = Msg_ReadLine(&MsgInfo, Buffer)) > 0)
         {
-            //printf("[%d][%s]\r\n", ReadNum, Buffer);
+            /* 读取消息结束，如果需要处理，就调用action处理 */
             if (strcmp(Buffer, pMsgEntry->pEndName) == 0)
             {
                 Msg_SetOffset(&MsgInfo, MsgInfo.Index + ReadNum);
@@ -808,6 +748,8 @@ void Msg_Read_Ex(const char * pMsg, int MaxLen, RoundInfo * pRound)
                 }
                 break;
             }
+
+            /* 继续读取处理消息 */
             if (pMsgEntry->LinerReader)
             {
                 pMsgEntry->LinerReader(Buffer, pRound);
@@ -850,13 +792,13 @@ void Debug_PrintSeatInfo(MSG_SEAT_INFO * pSeatInfo)
     return;
 }
 
-void Debug_PrintChardInfo(CARD * pCard, int CardNum)
+void Debug_PrintChardInfo(const char * pFile, int line, CARD * pCard, int CardNum)
 {
     int index = 0;
-    TRACE("Card Info:\r\n");
+    printf("[%s:%d]Card Info[%d]:\r\n", pFile, line, CardNum);
     for (index = 0; index < CardNum; index ++)
     {
-        TRACE("card_%d %s %s\n", index, GetCardColorName(pCard),
+        printf("card_%d %s %s\n", index, GetCardColorName(pCard),
                GetCardPointName(pCard->Point));
         pCard ++;
     }
@@ -958,7 +900,7 @@ void Test_001(void)
     Msg_Read_Ex(TestMessages[10], strlen(TestMessages[10]), &roundInfo);
     Debug_PrintSeatInfo(&roundInfo.SeatInfo);
     Debug_PrintBlindInfo(&roundInfo.Blind);
-    Debug_PrintChardInfo(roundInfo.HoldCards.Cards, 2);
+    //Debug_PrintChardInfo(__FILE__, __LINE__, roundInfo.HoldCards.Cards, 2);
     //
     printf("========show down============\r\n");
     Msg_Read_Ex(TestMessages[7], strlen(TestMessages[7]), &roundInfo);

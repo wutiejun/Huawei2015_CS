@@ -44,14 +44,17 @@ void TRACE_Log(const char *file, int len, const char *fmt, ...)
     va_list ap;
 
     pthread_mutex_lock(&LogLock);
-    gettimeofday(&time, NULL);
+//    gettimeofday(&time, NULL);
 
-    n = snprintf(p, size, "[%d.%06d][%s:%d]",
-                 (int)time.tv_sec, (int)time.tv_usec, file, len);
+//    n = snprintf(p, size, "[%d.%06d][%s:%d]",
+//                 (int)time.tv_sec, (int)time.tv_usec, file, len);
+
+    n = snprintf(p, size, "[%s:%d]", file, len);
 
     va_start(ap, fmt);
     n += vsnprintf(p + n, size, fmt, ap);
     va_end(ap);
+    //printf("%s", p);
     DebugWriteLog(p, n);
     pthread_mutex_unlock(&LogLock);
     return;
@@ -133,6 +136,13 @@ void ExitGame(RoundInfo * pRound)
     g_RunFlag = false;
 }
 
+int MyPlayerID = 0;
+
+int GetMyPlayerID(void)
+{
+    return MyPlayerID;
+}
+
 int main(int argc, char* argv[])
 {
     int ret = 0;
@@ -197,6 +207,7 @@ int main(int argc, char* argv[])
 
     /* Ïòserver×¢²á */
     char reg_msg[50]="";
+    MyPlayerID = my_id;
     snprintf(reg_msg, sizeof(reg_msg) - 1, "reg: %d %s need_notify \n", my_id, my_name);
     send(m_socket_id, reg_msg, (int)strlen(reg_msg)+1, 0);
 

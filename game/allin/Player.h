@@ -44,8 +44,10 @@ void TRACE_Log(const char *file, int len, const char *fmt, ...);
 
 #define TRACE(format, args...) \
         TRACE_Log(__FILE__, __LINE__, format, ## args);
-
 #endif
+
+#define DOT(arg)	printf("[%s:%d]%d\r\n", __FILE__, __LINE__, (int)arg)
+
 /*****************************************************************************************
 游戏流程:
 1.	player向server注册自己的id和name（reg-msg）
@@ -109,20 +111,17 @@ typedef enum SER_MSG_TYPES_
 {
     SER_MSG_TYPE_none = 0,
     // 服务器到player的消息
-    SER_MSG_TYPE_seat_info,
-    SER_MSG_TYPE_blind,
-    SER_MSG_TYPE_hold_cards,
-    SER_MSG_TYPE_hold_cards_inquire,
+    SER_MSG_TYPE_seat_info,				/* 1 */
+    SER_MSG_TYPE_blind,					// 2
+    SER_MSG_TYPE_hold_cards,			// 3
+    SER_MSG_TYPE_inquire,				// 4
     //
-    SER_MSG_TYPE_flop,
-    SER_MSG_TYPE_flop_inquire,
-    SER_MSG_TYPE_turn,
-    SER_MSG_TYPE_turn_inquire,
-    SER_MSG_TYPE_river,
-    SER_MSG_TYPE_river_inquire,
-    SER_MSG_TYPE_showdown,
-    SER_MSG_TYPE_pot_win,
-    SER_MSG_TYPE_notify,
+    SER_MSG_TYPE_flop,					// 5
+    SER_MSG_TYPE_turn,					// 6
+    SER_MSG_TYPE_river,					// 7
+    SER_MSG_TYPE_showdown,				// 8
+    SER_MSG_TYPE_pot_win,				// 9
+    SER_MSG_TYPE_notify,				// 10
     SER_MSG_TYPE_game_over,
     //
 } SER_MSG_TYPES;
@@ -166,20 +165,22 @@ typedef struct CARD_
 } CARD;
 
 /* 玩家的处理策略 */
-typedef enum PLAYER_Action_
+typedef enum PLAYER_Action_EN_
 {
     ACTION_NONE,
     ACTION_fold,
     ACTION_check,       /* 让牌，即在前面的玩家，什么也不做，把机会给后面的玩家 */
     ACTION_call,        /* 跟进，即前面有人raise，即不re-raise，也不弃牌，则call， */
     ACTION_raise,       /* 加1倍注 */
-//    ACTION_raise_5,     /* 加2-5倍注 */
-//    ACTION_raise_10,    /* 加6-10倍注 */
-//    ACTION_raise_20,    /* 加11-20倍注 */
-//    ACTION_raise_much,  /* 加的更多 */
     ACTION_allin,
     ACTION_BUTTON,
     //
+} PLAYER_Action_EN;
+
+typedef struct PLAYER_Action_
+{
+	PLAYER_Action_EN ActType;
+	int Args;
 } PLAYER_Action;
 
 typedef enum PLAYER_SEAT_TYPES_
@@ -266,7 +267,7 @@ typedef struct MSG_INQUIRE_PLAYER_ACTION_
     int Jetton;     /* 筹码数 */
     int Money;      /* 金币数 */
     int Bet;        /* 本局下注数 */
-    PLAYER_Action Action;   /* 当前动作 */
+    PLAYER_Action_EN Action;   /* 当前动作 */
 } MSG_INQUIRE_PLAYER_ACTION;
 
 /* 询问玩家时，每次最多8个玩家，如果一次询问中，多于8个的，循环覆盖即可 */
@@ -281,6 +282,7 @@ typedef struct MSG_INQUIRE_INFO_
 typedef struct RoundInfo_
 {
     int RoundIndex;
+	int MyPlayerID;
     SER_MSG_TYPES CurrentMsgType;
     SER_MSG_TYPES RoundStatus;                /* 当前局状态 */
 
@@ -330,6 +332,8 @@ typedef struct PLAYER_
 
 /****************************************************************************************/
 
+int GetMyPlayerID(void);
+
 void ResponseAction(const char * pMsg, int size);
 
 SER_MSG_TYPES Msg_GetMsgType(const char * pMsg, int MaxLen);
@@ -348,7 +352,7 @@ void Debug_ShowRoundInfo(RoundInfo *pRound);
 
 const char * GetCardColorName(CARD * pCard);
 
-void Debug_PrintChardInfo(CARD * pCard, int CardNum);
+void Debug_PrintChardInfo(const char * pFile, int line, CARD * pCard, int CardNum);
 
 void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown);
 
@@ -365,7 +369,9 @@ void STG_Dispose(void);
 
 const char * STG_GetAction(RoundInfo * pRound);
 
-const char * GetActionName(PLAYER_Action act);
+const char * GetActionName(PLAYER_Action_EN act);
+
+MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound);
 
 /****************************************************************************************/
 

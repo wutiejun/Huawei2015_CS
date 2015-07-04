@@ -34,4 +34,17 @@ CARD_TYPES Card_CalculateEx(CARD * pPublicCards, int CardNum)
     return CardType;
 }
 
+/* 判断两张手牌是否是一对 */
+bool Card_IsHoldPair(CARD HoldCards[2])
+{
+    return HoldCards[0].Point == HoldCards[1].Point;
+}
+
+/* 判断两张手牌是否是同花色 */
+bool Card_IsHoldSameColor(CARD HoldCards[2])
+{
+    return HoldCards[0].Color == HoldCards[1].Color;
+}
+
+
 

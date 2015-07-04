@@ -1,4 +1,5 @@
 #!/bin/bash
-make -C ../allin clean
-make -C ../allin 
-cp ../allin/game ./ 
+make -C ../demo_3 clean
+make -j32 -C ../demo_3 
+#make -C ../demo_3 
+cp ../demo_3/game ./ 

@@ -29,7 +29,7 @@ bool server_msg_process(int size, const char* msg)
         {
             response = g_Action;
         }
-//        usleep(400 * 1000);
+        //usleep(400 * 1000);
         send(m_socket_id, response, (int)strlen(response)+1, 0);
     }
 

@@ -183,16 +183,12 @@ void STG_SaveStudyData(void)
 void STG_SaveRoundData(RoundInfo * pRound)
 {
     static int RoundIndex = 0;
-
-    printf("====save round %d =========\r\n", pRound->RoundIndex);
-
     QueueAdd(&g_round_queue, pRound, sizeof(RoundInfo));
-
     memset(pRound, 0, sizeof(RoundInfo));
-    //
     RoundIndex ++;
+    printf("Save data for round %d\r\n", RoundIndex);
     pRound->RoundIndex = RoundIndex;
-
+    pRound->MyPlayerID = GetMyPlayerID();
     return;
 }
 
@@ -203,16 +199,11 @@ int STG_CheckWinRation(CARD_TYPES Type, CARD_POINT MaxPoint, int PlayerNum)
     int WinNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].WinTimes;
     int ShowNum = g_stg.AllWinCards[PlayerNum - 1][Type][MaxPoint].ShowTimes;
 
-//    printf("Check Win Ration[%d]: %s %s: %d / %d;\r\n",
-//           PlayerNum,
-//          Msg_GetCardTypeName(Type),
-//          GetCardPointName(MaxPoint),
-//          WinNum, ShowNum);
-
     if (ShowNum > 0)
     {
         return (WinNum * 100) / ShowNum;
     }
+    
     return 0;
 }
 
@@ -236,16 +227,11 @@ int STG_CheckWinRationByType(CARD_TYPES Type, int PlayerNum)
     return 0;
 }
 
-/* 判断两张手牌是否是一对 */
-bool STG_IsHoldPair(RoundInfo * pRound)
+void SGT_BuildAction(PLAYER_Action * pAct, PLAYER_Action_EN act, int arg)
 {
-    return pRound->HoldCards.Cards[0].Point == pRound->HoldCards.Cards[1].Point;
-}
-
-/* 判断两张手牌是否是同花色 */
-bool STG_IsHoldSameColor(RoundInfo * pRound)
-{
-    return pRound->HoldCards.Cards[0].Color == pRound->HoldCards.Cards[1].Color;
+    pAct->ActType = act;
+    pAct->Args = arg;
+    return;
 }
 
 /* 取得本局还在场的完家 */
@@ -256,7 +242,7 @@ int STG_GetActivePlayer(RoundInfo * pRound)
 }
 
 /* 处理手牌阶段的inquire */
-PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
+int STG_GetHoldAction(RoundInfo * pRound, PLAYER_Action * pAction)
 {
     int WinRation = 0;
     CARD AllCards[2];
@@ -272,7 +258,11 @@ PLAYER_Action STG_GetHoldAction(RoundInfo * pRound)
     {
         return ACTION_raise;
     }
-
+    else
+    {
+        
+    }
+    
     /* 再分析当前对手情况 */
 
 
@@ -295,7 +285,7 @@ bool STG_IsMaxPointInHand(CARD_POINT MaxPoint, CARD Cards[2])
 /*
     河牌时的处理，关键
 */
-PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
+void STG_GetRiverAction(RoundInfo * pRound, PLAYER_Action * pAction)
 {
     int WinRation = 0;
     CARD AllCards[7];
@@ -326,35 +316,39 @@ PLAYER_Action STG_GetRiverAction(RoundInfo * pRound)
             //pRound-> 记录raise的次数和总金额，如果超过比例，就不再raise，而是check或者fold
             if (pRound->Inquires[3].TotalPot > 1000)
             {
-                return ACTION_fold;
+                return SGT_BuildAction(pAction, ACTION_fold, 0);
             }
             else
             {
-                return ACTION_check;
+                return SGT_BuildAction(pAction, ACTION_check, 0);
             }
         }
         else if (WinRation <= 50)
         {
             if (pRound->RaiseTimes ++ < 2)
             {
-                return ACTION_raise;    /* 只riase到指定比例 */
+                return SGT_BuildAction(pAction, ACTION_raise, 1);
             }
-            return ACTION_check;
+            return SGT_BuildAction(pAction, ACTION_check, 1);
         }
         else if (WinRation <= 70)
         {
             if (pRound->RaiseTimes ++ < 3)
             {
-                return ACTION_raise;    /* 只riase到指定比例 */
+                return SGT_BuildAction(pAction, ACTION_raise, 3);
             }
-            return ACTION_check;
+            return SGT_BuildAction(pAction, ACTION_check, 1);
         }
         else
         {
-            return ACTION_allin;    /*  */
+            if (pRound->RaiseTimes ++ < 5)
+            {
+                return SGT_BuildAction(pAction, ACTION_raise, 5);
+            }
+            return SGT_BuildAction(pAction, ACTION_check, 1);
         }
     }
-    return ACTION_fold;
+    return SGT_BuildAction(pAction, ACTION_fold, 1);
 }
 
 #define INIT_TWOCARD_NUM 40
@@ -427,9 +421,6 @@ INIT_TWOCARD_INFO_EXTEND Init_TwoCard_Info_Extend[INIT_TWOCARD_NUM_EXTEND] =
     {7061,TWOCARD_INFO_C3,TWOCARD_INFO_C4},
 };
 
-
-MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound);
-
 //获取首轮在我之前有多少存活玩家数
 int ST_GetAlivePlayerNum(RoundInfo *pRound)
 {
@@ -470,7 +461,7 @@ int ST_GetAlivePetPlayerNum(RoundInfo *pRound)
 /* 输出：                                                           */
 /* 输出：每局开始时调用                                                 */
 /************************************************************************/
-PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
+void Get_Init_Two_Card_Action_Extend(RoundInfo *pRound, PLAYER_Action * pAction)
 {
 	unsigned int i;
 	int cardinfo;
@@ -482,8 +473,10 @@ PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
 	int No_Pet_Action = TWOCARD_INFO_BUTT;    //在之前无人加注
 	int With_Pet_Action = TWOCARD_INFO_BUTT;  //在之前有人加注
 
+    DOT(pRound->RoundStatus);
+
     /* 取得两张手牌 */
-	memcpy(pRound->HoldCards.Cards, CardInfo, sizeof(CardInfo));
+	memcpy(CardInfo, pRound->HoldCards.Cards, sizeof(CardInfo));
 
 	if (CardInfo[0].Point > CardInfo[1].Point)
 	{
@@ -519,47 +512,47 @@ PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
 		/*无论你前面玩家如何下注，你都要加注*/
 		if (No_Pet_Action == TWOCARD_INFO_R)
 		{
-			return ACTION_raise;
+		    return SGT_BuildAction(pAction, ACTION_raise, 1);
 		}
 		/*无论有多少个玩家进入游戏，你都要跟注*/
 		else if(No_Pet_Action == TWOCARD_INFO_C)
 		{
-			return ACTION_call;
+		    return SGT_BuildAction(pAction, ACTION_call, 0);
 		}
 		/*在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
 		else if(No_Pet_Action == TWOCARD_INFO_C2)
 		{
 			if (alive_num > 1)
 			{
-				return ACTION_call;
+                return SGT_BuildAction(pAction, ACTION_call, 0);
 			}
 			else
 			{
-				return ACTION_fold;
+                return SGT_BuildAction(pAction, ACTION_fold, 0);
 			}
-		}
-		/*在你之前如果有三个或三个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		}		
 		else if(No_Pet_Action == TWOCARD_INFO_C3)
 		{
+    		/*在你之前如果有三个或三个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
 			if (alive_num > 2)
 			{
-				return ACTION_call;
+                return SGT_BuildAction(pAction, ACTION_call, 0);
 			}
 			else
 			{
-				return ACTION_fold;
+                return SGT_BuildAction(pAction, ACTION_fold, 0);
 			}
-		}
-		/*在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+		}		
 		else if(No_Pet_Action == TWOCARD_INFO_C4)
 		{
+    		/*在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
 			if (alive_num > 3)
 			{
-				return ACTION_call;
+                return SGT_BuildAction(pAction, ACTION_call, 0);
 			}
 			else
 			{
-				return ACTION_fold;
+                return SGT_BuildAction(pAction, ACTION_fold, 0);
 			}
 		}
 	}
@@ -568,23 +561,23 @@ PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
 		/*你应该再加注*/
 		if (With_Pet_Action == TWOCARD_INFO_RR)
 		{
-			return ACTION_raise;
-		}
-		/*无论有多少个玩家进入游戏，你都要跟注*/
+            return SGT_BuildAction(pAction, ACTION_raise, 1);
+		}		
 		else if(With_Pet_Action == TWOCARD_INFO_C)
 		{
-			return ACTION_call;
-		}
-		/*在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
+    		/*无论有多少个玩家进入游戏，你都要跟注*/
+            return SGT_BuildAction(pAction, ACTION_call, 0);
+		}		
 		else if(With_Pet_Action == TWOCARD_INFO_C2)
 		{
+            /*在你之前如果有两个或两个以上的玩家进入游戏，你才可以跟注，否则弃牌*/		
 			if (alive_num > 1)
 			{
-				return ACTION_call;
+                return SGT_BuildAction(pAction, ACTION_call, 0);
 			}
 			else
 			{
-				return ACTION_fold;
+                return SGT_BuildAction(pAction, ACTION_fold, 0);
 			}
 		}
 		/*在你之前如果有四个或四个以上的玩家进入游戏，你才可以跟注，否则弃牌*/
@@ -592,66 +585,58 @@ PLAYER_Action Get_Init_Two_Card_Action_Extend(RoundInfo *pRound)
 		{
 			if (alive_num > 3)
 			{
-				return ACTION_call;
+				return SGT_BuildAction(pAction, ACTION_call, 0);
 			}
 			else
 			{
-				return ACTION_fold;
+				return SGT_BuildAction(pAction, ACTION_fold, 0);
 			}
-		}
-		/*你应该弃牌*/
+		}		
 		else if(With_Pet_Action == TWOCARD_INFO_F)
 		{
-			return ACTION_fold;
+    		/*你应该弃牌*/
+			return SGT_BuildAction(pAction, ACTION_fold, 0);
 		}
 	}
 
-	return ACTION_BUTTON;
+	return SGT_BuildAction(pAction, ACTION_fold, 0);
 }
 
 /* 只会在inquire中读取处理动作 */
 int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
 {
     const char * pAction = NULL;
-    PLAYER_Action  Action = ACTION_fold;
-    Action = ACTION_check;
+    PLAYER_Action  Action = {ACTION_fold};
 
-    //printf("Get action:%d;\r\n", pRound->RoundStatus);
+    DOT(pRound->PublicCards.CardNum);
 
-    switch (pRound->RoundStatus)
+    switch (pRound->PublicCards.CardNum)
     {
-    default:
-         break;
-    case SER_MSG_TYPE_hold_cards_inquire:/* 只有两张手牌时的inqurie */
-        //Action = ACTION_check;
-        Action = Get_Init_Two_Card_Action_Extend(pRound);
-        if (Action == ACTION_BUTTON)
-        {
-            Action = ACTION_fold;
-        }
-        break;
-    case SER_MSG_TYPE_flop_inquire:     /* 三张公牌后的inqurie */
-        //Action = ACTION_check;
-        //Action = STG_GetFlopAction(pRound);
-        break;
-    case SER_MSG_TYPE_turn_inquire:     /* 四张公牌后的inqurie */
-        //Action = ACTION_check;
-        //Action = STG_GetTurnAction(pRound);
-        break;
-    case SER_MSG_TYPE_river_inquire:
-        Action = STG_GetRiverAction(pRound);
-        break;
+        default:
+        case 0:/* 只有两张手牌时的inqurie */
+            Get_Init_Two_Card_Action_Extend(pRound, &Action);
+            break;
+        case 3:     /* 三张公牌后的inqurie */
+            Get_Init_Two_Card_Action_Extend(pRound, &Action);
+            break;
+        case 4:     /* 四张公牌后的inqurie */
+            Get_Init_Two_Card_Action_Extend(pRound, &Action);
+            break;
+        case 5:
+            STG_GetRiverAction(pRound, &Action);
+            break;
     }
 
-    pAction = GetActionName(Action);
-    if (Action == ACTION_raise)
+    pAction = GetActionName(Action.ActType);
+    if (Action.ActType == ACTION_raise)
     {
-        return sprintf(ActionBuf, "%s %d", pAction, 1);
+        return sprintf(ActionBuf, "%s %d", pAction, Action.Args);
     }
     else
     {
         return sprintf(ActionBuf, "%s", pAction);
     }
+    
 }
 
 /* 处理inquire的回复 */
@@ -661,7 +646,7 @@ void STG_Inquire_Action(RoundInfo * pRound)
     //const char* response = "check";
     char ActionBufer[128] = {0};
     int ResNum = STG_GetAction(pRound, ActionBufer);
-    TRACE("Get Action:%s.\r\n", ActionBufer);
+    printf("Get Action:%s.\r\n", ActionBufer);
     ResponseAction(ActionBufer, ResNum);
     return;
 }
@@ -776,6 +761,8 @@ CARD_TYPES STG_GetCardTypes(CARD *pCards, int CardNum, CARD_POINT MaxPoints[CARD
     CARD_TYPES CardType = CARD_TYPES_High;
     CARD_TYPES ColorType = CARD_TYPES_None;
     CARD_COLOR FlushColor = CARD_COLOR_Unknow;
+
+    Debug_PrintChardInfo(__FILE__, __LINE__, pCards, CardNum);
 
     memset(&AllPoints, 0, sizeof(AllPoints));
     memset(&AllColors, 0, sizeof(AllColors));
@@ -983,7 +970,7 @@ void * STG_ProcessThread(void *pArgs)
         pQueueEntry = QueueGet(&g_round_queue);
         if (pQueueEntry == NULL)
         {
-            usleep(1000);
+            //usleep(1000);
             continue;
         }
 
