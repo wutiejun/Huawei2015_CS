@@ -1,6 +1,6 @@
 #
 
-SUB_OBJS1=main.o card.o strategy.o analyse.o msg_reader.o debug.o
+SUB_OBJS1=main.o card.o strategy.o analyse.o msg_reader.o player.o debug.o
 
 SUB_OBJS2=msg_reader.o
 

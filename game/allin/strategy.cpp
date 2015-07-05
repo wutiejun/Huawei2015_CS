@@ -610,6 +610,9 @@ int STG_GetAction(RoundInfo * pRound, char ActionBuf[128])
 
     DOT(pRound->PublicCards.CardNum);
 
+    Debug_PrintChardInfo(__FILE__, __LINE__, 
+        pRound->PublicCards.Cards, pRound->PublicCards.CardNum);
+
     switch (pRound->PublicCards.CardNum)
     {
         default:
@@ -931,14 +934,11 @@ void STG_AnalyseWinCard(RoundInfo *pRound)
 //    printf("pRound->ShowDown.PlayerNum =%d;\r\n",  pRound->ShowDown.PlayerNum );
     for (index = 0; index < pRound->ShowDown.PlayerNum - 1; index ++)
     {
-        /* 牌型算法要对AllCards排序，需要每次都重新赋值 */
-        memcpy(&AllCards, &pRound->ShowDown.PublicCards, sizeof(pRound->ShowDown.PublicCards));
+        /* 牌型算法要对AllCards排序，需要每次都重新赋值，但不一定公牌都是有5张 */
+        memcpy(AllCards, pRound->PublicCards.Cards, sizeof(CARD) * pRound->PublicCards.CardNum);
         pPlayCard = &pRound->ShowDown.Players[index];
         AllCards[5] = pPlayCard->HoldCards[0];
         AllCards[6] = pPlayCard->HoldCards[1];
-        //TRACE("Debug_PrintShowDown:%d player %d;\r\n", pRound->RoundIndex, index);
-        //Debug_PrintShowDown(&pRound->ShowDown);
-        //Debug_PrintChardInfo(AllCards, 7);
         //
         STG_AnalyseWinCard_AllCards(AllCards,
                                     pRound->ShowDown.Players[index].Index,
