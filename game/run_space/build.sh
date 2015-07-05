@@ -1,5 +1,6 @@
-#!/bin/bash
-make -C ../demo_3 clean
-make -j32 -C ../demo_3 
-#make -C ../demo_3 
-cp ../demo_3/game ./ 
+#!/bin/bash 
+# allin demo_1
+make -C ../allin clean
+make -j32 -C ../allin 
+#make -C ../allin 
+cp ../allin/game ./ 

@@ -25,12 +25,9 @@ delay=0
 # 服务器IP
 ser_ip=127.0.0.1
 
-<<<<<<< HEAD
 # PK次数
 run_times=1
 
 # 每次PK完以后，是否统计排名
 stat_rank=1
 
-=======
->>>>>>> parent of 7a65cf3... 增加脚本，计算排名。

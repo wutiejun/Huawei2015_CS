@@ -16,7 +16,7 @@ export "PLAYER2_ID"=1002
 ./gameserver -gip $ser_ip -seq replay -r $reg -d $delay -m $money -b $blind -t $jetton -h $hand 0</dev/null 1>/dev/null 2>/dev/null &
 
 # Start all users
-ltrace -c ./game 127.0.0.1 6000 127.0.0.1 6001 1001 & 
+./game 127.0.0.1 6000 127.0.0.1 6001 1001 & 
 
 ./check 127.0.0.1 6000 127.0.0.2 6002 1002 & 
 

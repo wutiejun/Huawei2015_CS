@@ -17,48 +17,9 @@
 
 int m_socket_id = -1;
 int g_RunFlag = true;
-pthread_mutex_t LogLock;
 RoundInfo LocalRoundInfo = {(SER_MSG_TYPES)0};
 
-static void DebugWriteLog(const char * Msg, int size)
-{
-    static int log_file = -1;
-    char LogFileName[64] = {0};
-    if (log_file == -1)
-    {
-        sprintf(LogFileName, "./msg_log_%d.txt", (int)getpid());
-        log_file = open(LogFileName, O_CREAT | O_WRONLY | O_TRUNC | O_SYNC);
-    }
-    //printf(Msg);
-    write(log_file, Msg, size);
-    syncfs(log_file);
-    return;
-}
-
-void TRACE_Log(const char *file, int len, const char *fmt, ...)
-{
-    int n;
-    int size = 1024;     /* Guess we need no more than 100 bytes. */
-    char p[1024] = {0};
-    struct timeval time;
-    va_list ap;
-
-    pthread_mutex_lock(&LogLock);
-//    gettimeofday(&time, NULL);
-
-//    n = snprintf(p, size, "[%d.%06d][%s:%d]",
-//                 (int)time.tv_sec, (int)time.tv_usec, file, len);
-
-    n = snprintf(p, size, "[%s:%d]", file, len);
-
-    va_start(ap, fmt);
-    n += vsnprintf(p + n, size, fmt, ap);
-    va_end(ap);
-    //printf("%s", p);
-    DebugWriteLog(p, n);
-    pthread_mutex_unlock(&LogLock);
-    return;
-}
+const char * g_Action = NULL;
 
 bool server_msg_process(int size, const char* msg)
 {
@@ -77,7 +38,6 @@ bool server_msg_process(int size, const char* msg)
     return true;
 }
 
-const char * g_Action = NULL;
 
 void ResponseAction(const char * pMsg, int size)
 {

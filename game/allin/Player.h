@@ -330,7 +330,7 @@ typedef struct PLAYER_
 
 } PLAYER;
 
-/****************************************************************************************/
+/******************************msg 函数**********************************************************/
 
 int GetMyPlayerID(void);
 
@@ -348,13 +348,9 @@ const char *Msg_GetCardTypeName(CARD_TYPES Type);
 
 const char * GetCardPointName(CARD_POINT point);
 
-void Debug_ShowRoundInfo(RoundInfo *pRound);
-
 const char * GetCardColorName(CARD * pCard);
 
-void Debug_PrintChardInfo(const char * pFile, int line, CARD * pCard, int CardNum);
-
-void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown);
+const char * Msg_GetPlayType(PLAYER_SEAT_INFO *pPlayerInfo);
 
 /*****************************stg 函数***********************************************************/
 
@@ -373,9 +369,17 @@ const char * GetActionName(PLAYER_Action_EN act);
 
 MSG_INQUIRE_INFO * Msg_GetCurrentInquireInfo(RoundInfo * pRound);
 
-/****************************************************************************************/
 
-/*****************************player 函数***********************************************/
+/*****************************debug 函数***********************************************/
+void Debug_PrintInquireInfo(MSG_INQUIRE_INFO * pInquire);
+
+
+void Debug_PrintChardInfo(const char * pFile, int line, CARD * pCard, int CardNum);
+
+void Debug_PrintShowDown(MSG_SHOWDWON_INFO *pShowDown);
+
+void Debug_ShowRoundInfo(RoundInfo *pRound);
+
 
 /****************************************************************************************/
 
